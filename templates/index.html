@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Construtora Sousa Araujo</title>
+    <link rel="icon" href="https://i.postimg.cc/C18tJd0C/s.png" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #b03030; /* Vermelho mais escuro */
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column; /* Alinha os itens verticalmente */
+            height: 100vh;
+            color: #333; /* Texto escuro */
+            position: relative; 
+        }
+
+        .header {
+            background-color: #c0392b; /* Cor do rodapé */
+            color: white;
+            display: flex; /* Usar flexbox para alinhamento */
+            justify-content: space-between; /* Espaço entre os itens */
+            align-items: center; /* Centraliza verticalmente */
+            padding: 10px 20px;
+        }
+
+        .header-center {
+            flex-grow: 1; /* Permite que o elemento central cresça */
+            text-align: center; /* Centraliza o texto */
+            font-size: 45px; /* Aumenta o tamanho da fonte */
+            font-weight: bold; /* Texto em negrito */
+        }
+
+        .sidebar {
+            width: 200px; /* Largura do menu lateral */
+            background-color: #c0392b; /* Cor de fundo do menu */
+            color: white;
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            display: none; /* Esconde o menu por padrão */
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+        }
+
+        .sidebar h2 {
+            margin: 0;
+            font-size: 18px;
+            cursor: pointer; /* Muda o cursor para indicar que é clicável */
+        }
+
+        .sidebar ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0; /* Remove a margem */
+        }
+
+        .sidebar ul li {
+            margin: 10px 0;
+        }
+
+        .sidebar ul li a {
+            color: white;
+            text-decoration: none;
+        }
+
+        .sidebar ul li a:hover {
+            text-decoration: underline;
+        }
+
+        .toggle-button {
+            background: none; /* Remove o fundo */
+            border: none; /* Remove a borda */
+            cursor: pointer;
+            font-size: 30px; /* Tamanho do ícone */
+            color: #a02727; /* Cor do ícone */
+        }
+
+        .toggle-button:hover {
+            color: #8c2323; /* Vermelho mais escuro ao passar o mouse */
+        }
+
+        .container {
+            margin: 20px auto; /* Centraliza horizontalmente */
+            background-color: #ffffff; /* Branco */
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            padding: 20px; /* Diminuindo o padding */
+            text-align: center;
+            max-width: 1000px; /* Aumentando a largura máxima */
+            width: 90%; /* Largura responsiva */
+            transition: transform 0.3s;
+        }
+
+        .container:hover {
+            transform: translateY(-5px);
+        }
+
+        .logo {
+            width: 150px; /* Tamanho da logo ajustado */
+            height: auto;
+        }
+
+        h1 {
+            color: #c0392b; /* Vermelho */
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            table-layout: auto; /* Permite que as colunas se ajustem automaticamente */
+        }
+
+        table, th, td {
+            border: 1px solid #ddd; /* Cinza claro */
+        }
+
+        th, td {
+            padding: 10px; 
+            text-align: left;
+            font-size: 14px; 
+            white-space: nowrap; /* Impede quebras de linha dentro da célula */
+        }
+
+        th {
+            background-color: #c0392b; /* Vermelho */
+            color: white;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        tr:hover {
+            background-color: #f2f2f2; /* Branco claro */
+        }
+
+        button {
+            padding: 10px 15px; 
+            background-color: #c0392b; /* Vermelho */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px; 
+            transition: background-color 0.3s, transform 0.3s;
+        }
+
+        button:hover {
+            background-color: #a93226; /* Vermelho mais escuro */
+            transform: scale(1.05);
+        }
+
+        .table-container {
+            max-height: 300px; 
+            overflow-y: auto; 
+            overflow-x: auto; 
+            margin-bottom: 20px; 
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .card {
+            background-color: #ffffff; /* Branco */
+            border: 1px solid #ddd; /* Cinza claro */
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: left;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.3s;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .card h2 {
+            color: #c0392b; /* Vermelho */
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .card label {
+            margin-bottom: 10px; /* Espaço entre o texto e o campo */
+            display: block; /* Faz o label ocupar a linha toda */
+            font-weight: bold; /* Texto em negrito */
+        }
+
+        input[type="number"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 15px; /* Aumentando o espaçamento inferior */
+            border: 1px solid #ddd; /* Cinza claro */
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .watermark {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 14px; 
+            color: rgba(0, 0, 0, 0.3); 
+            pointer-events: none; 
+        }
+
+        /* Estilo responsivo para tabelas em telas menores */
+        @media (max-width: 600px) {
+            table, th, td {
+                font-size: 12px; 
+            }
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
+    <script>
+        function toggleMenu() {
+            const sidebar = document.querySelector('.sidebar');
+            sidebar.style.display = sidebar.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function closeMenu(event) {
+            const sidebar = document.querySelector('.sidebar');
+            const toggleButton = document.querySelector('.toggle-button');
+
+            // Verifica se o clique foi fora da sidebar e do botão
+            if (sidebar.style.display === 'block' && !sidebar.contains(event.target) && !toggleButton.contains(event.target)) {
+                sidebar.style.display = 'none';
+            }
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Endereço copiado: ' + text);
+            }, (err) => {
+                console.error('Erro ao copiar: ', err);
+            });
+        }
+
+        // Adiciona um event listener para cliques no documento
+        document.addEventListener('click', closeMenu);
+    </script>
+</head>
+<body>
+    <div class="header">
+        <button class="toggle-button" onclick="toggleMenu()">&#9776;</button> <!-- Ícone de menu -->
+        <div class="header-center">Sousa Araujo</div> <!-- Texto centralizado -->
+        <img src="https://i.postimg.cc/LXv0bCvH/logo-souza.webp" alt="Logo" class="logo"> <!-- Logo no canto direito -->
+    </div>
+    <div class="sidebar">
+        <h2>Menu</h2>
+        <ul>
+            <li><a href="#">Início</a></li>
+            <li><a href="#">Sobre</a></li>
+            <li><a href="#">Contato</a></li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <h1>Lista de Repasse</h1>
+        <div class="table-container"> 
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome</th>
+                        <th>Email</th>
+                        <th>Anexo</th>
+                        <th>Supervisor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for colaborador in colaboradores %}
+                    <tr>
+                        <td>{{ colaborador.id }}</td>
+                        <td>{{ colaborador.nome }}</td>
+                        <td>{{ colaborador.email }}</td>
+                        <td>
+                            <a href="{{ colaborador.anexo }}" target="_blank" onclick="copyToClipboard('{{ colaborador.anexo }}'); return false;">Visualizar Anexo</a>
+                        </td>
+                        <td>{{ colaborador.supervisor }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <form action="/enviar_emails" method="post" style="margin-top: 20px;">
+            <button type="submit">Enviar E-mails para Todos</button>
+        </form>
+
+        <div class="card">
+            <h2>Enviar E-mail Individual</h2>
+            <form action="/enviar_emails" method="post">
+                <label for="id_colaborador">Digite o id do colaborador:</label>
+                <input type="number" name="id_colaborador" id="id_colaborador" placeholder="ID do colaborador" required>
+                <button type="submit">Enviar</button>
+            </form>
+        </div>
+
+        <!-- Card de e-mails já enviados -->
+        <div class="card">
+            <h2>Enviados</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nome</th>
+                        <th>Email</th>
+                        <th>Data de Envio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for email in emails_enviados %}
+                    <tr>
+                        <td>{{ email.id }}</td>
+                        <td>{{ email.nome }}</td>
+                        <td>{{ email.email }}</td>
+                        <td>{{ email.data_envio }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+    <div class="watermark">Created by Bruno Alves</div> <!-- Marca d'água -->
+</body>
+</html>
