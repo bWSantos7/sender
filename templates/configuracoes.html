@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block header_title %}Configurações do Sistema{% endblock %}
+
+{% block content %}
+<form action="{{ url_for('configuracoes') }}" method="post" class="space-y-8">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- SMTP -->
+        <div class="bg-white border border-sa-gray rounded-lg shadow-sm p-8 h-fit">
+            <div class="mb-8 border-b border-sa-gray pb-4">
+                <h3 class="text-sm font-bold text-sa-text uppercase tracking-widest">Servidor de E-mail</h3>
+                <p class="text-[11px] text-sa-muted mt-1">Configure o SMTP para disparos automáticos.</p>
+            </div>
+
+            <div class="space-y-5">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Remetente</label>
+                        <input type="text" name="from_name" value="{{ email_conf.from_name if email_conf else '' }}" class="w-full px-4 py-2.5 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">E-mail</label>
+                        <input type="email" name="smtp_user" value="{{ email_conf.smtp_user if email_conf else '' }}" class="w-full px-4 py-2.5 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Servidor Host</label>
+                        <input type="text" name="smtp_server" value="{{ email_conf.smtp_server if email_conf else 'smtp.gmail.com' }}" class="w-full px-4 py-2.5 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Porta</label>
+                        <input type="number" name="smtp_port" value="{{ email_conf.smtp_port if email_conf else 587 }}" class="w-full px-4 py-2.5 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
+                    </div>
+                </div>
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Senha de Aplicativo</label>
+                    <input type="password" name="smtp_pass" placeholder="••••••••••••••••" class="w-full px-4 py-2.5 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
+                </div>
+            </div>
+        </div>
+
+        <!-- Parâmetros das Comissões -->
+        <div class="bg-white border border-sa-gray rounded-lg shadow-sm p-8">
+            <div class="mb-8 border-b border-sa-gray pb-4">
+                <h3 class="text-sm font-bold text-sa-text uppercase tracking-widest">Parâmetros das Comissões</h3>
+                <p class="text-[11px] text-sa-muted mt-1">Links e datas para geração dos PDFs.</p>
+            </div>
+
+            <div class="space-y-8">
+                {% for conf in configs %}
+                <div class="space-y-4 pb-6 border-b border-slate-100 last:border-0 last:pb-0">
+                    <div class="flex justify-between items-center">
+                        <h4 class="text-xs font-bold text-sa-wine uppercase tracking-widest">{{ conf.tipo }}</h4>
+                        <a href="/preview_email?tipo={{ conf.tipo }}" target="_blank" class="text-[10px] font-bold text-sa-muted hover:text-sa-wine transition-colors uppercase tracking-widest flex items-center gap-1">
+                            <i data-lucide="eye" class="w-3 h-3"></i> Preview
+                        </a>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-1.5 col-span-2">
+                            <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Link do Formulário</label>
+                            <input type="text" name="{{ conf.tipo }}_link_form" value="{{ conf.link_form or '' }}" class="w-full px-4 py-2 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
+                        </div>
+                        <div class="space-y-1.5 col-span-2">
+                            <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Link do Formulário Retroativo</label>
+                            <input type="text" name="{{ conf.tipo }}_link_form_retroativo" value="{{ conf.link_form_retroativo or '' }}" class="w-full px-4 py-2 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Mês Referência</label>
+                            <input type="text" name="{{ conf.tipo }}_mes_referencia" value="{{ conf.mes_referencia or '' }}" placeholder="Ex: Janeiro/2026" class="w-full px-4 py-2 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Data Limite</label>
+                            <input type="text" name="{{ conf.tipo }}_data_limite_envio" value="{{ conf.data_limite_envio or '' }}" class="w-full px-4 py-2 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
+                        </div>
+                        <div class="space-y-1.5 col-span-2">
+                            <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Data Pagamento</label>
+                            <input type="text" name="{{ conf.tipo }}_data_pagamento" value="{{ conf.data_pagamento or '' }}" class="w-full px-4 py-2 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions & Admin -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-end">
+        <div class="bg-white border border-sa-gray rounded-lg shadow-sm p-8">
+            <h4 class="text-xs font-bold text-sa-text uppercase tracking-widest mb-4">Administrativo</h4>
+            <a href="/download_db" class="w-full flex items-center justify-center gap-2 py-3 border border-sa-gray rounded text-[10px] font-bold text-sa-muted hover:bg-slate-50 transition-all uppercase tracking-widest">
+                <i data-lucide="database" class="w-3 h-3"></i>
+                Backup Banco de Dados
+            </a>
+        </div>
+        
+        <div>
+            <button type="submit" class="w-full h-14 bg-sa-dark text-white font-bold rounded hover:bg-sa-wine transition-all shadow-lg text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                Salvar Todas as Configurações
+            </button>
+        </div>
+    </div>
+</form>
+{% endblock %}

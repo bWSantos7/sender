@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block header_title %}Gerenciador de Arquivos{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="bg-white border border-sa-gray p-6 rounded-lg shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
+        <div>
+            <h3 class="text-sm font-bold text-sa-text uppercase tracking-widest">Repositório PDFs</h3>
+            <p class="text-xs text-sa-muted mt-1 font-medium">Selecione arquivos para download ou exclusão.</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="baixarSelecionados()" class="px-5 py-2.5 bg-sa-wine text-white rounded text-[10px] font-bold uppercase tracking-widest hover:bg-sa-red transition-all flex items-center gap-2">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                BAIXAR (.ZIP)
+            </button>
+            <button onclick="excluirSelecionados()" class="px-5 py-2.5 border border-sa-gray rounded text-[10px] font-bold text-sa-muted uppercase tracking-widest hover:text-sa-red hover:bg-red-50 transition-all flex items-center gap-2">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                EXCLUIR
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-white border border-sa-gray rounded shadow-sm overflow-hidden">
+        <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-sa-muted font-bold uppercase tracking-wider">
+                <tr>
+                    <th class="px-6 py-3 border-b border-sa-gray w-10">
+                        <input type="checkbox" id="select-all" class="w-4 h-4 rounded border-sa-gray text-sa-wine focus:ring-sa-wine transition-all">
+                    </th>
+                    <th class="px-6 py-3 border-b border-sa-gray">Nome do Arquivo</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">Tipo</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">Tamanho</th>
+                    <th class="px-6 py-3 border-b border-sa-gray text-right">Data</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-sa-gray">
+                {% for arquivo in arquivos %}
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4">
+                        <input type="checkbox" class="file-checkbox w-4 h-4 rounded border-sa-gray text-sa-wine focus:ring-sa-wine transition-all" data-path="{{ arquivo.caminho }}">
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-3">
+                            <i data-lucide="file-text" class="w-4 h-4 text-slate-400"></i>
+                            <span class="font-semibold text-sa-text truncate max-w-[300px]">{{ arquivo.nome }}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">{{ arquivo.tipo }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-sa-muted">{{ arquivo.tamanho }}</td>
+                    <td class="px-6 py-4 text-right text-sa-muted">{{ arquivo.data }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="px-6 py-20 text-center">
+                        <i data-lucide="folder-x" class="w-10 h-10 text-sa-gray mx-auto mb-4"></i>
+                        <p class="text-xs font-bold text-sa-muted uppercase tracking-widest">Nenhum arquivo encontrado</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.getElementById('select-all').addEventListener('change', function() {
+    document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = this.checked);
+});
+function baixarSelecionados() {
+    const paths = Array.from(document.querySelectorAll('.file-checkbox:checked')).map(cb => cb.dataset.path);
+    if (paths.length === 0) return;
+    const params = new URLSearchParams();
+    paths.forEach(p => params.append('arquivos', p));
+    window.location.href = '/api/download_massa?' + params.toString();
+}
+function excluirSelecionados() {
+    const paths = Array.from(document.querySelectorAll('.file-checkbox:checked')).map(cb => cb.dataset.path);
+    if (paths.length === 0) return;
+    if (!confirm(`Excluir ${paths.length} arquivos?`)) return;
+    fetch('/api/excluir_arquivos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ arquivos: paths }) }).then(() => window.location.reload());
+}
+</script>
+{% endblock %}

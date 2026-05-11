@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-[#F8F9FA]">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sousa Araújo | Sistema</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}?v=1">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sa: {
+                            dark: '#1A1A1B',
+                            wine: '#720917',
+                            red: '#A90011',
+                            gray: '#E9ECEF',
+                            text: '#212529',
+                            muted: '#6C757D'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'Segoe UI', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        .sidebar-transition { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        .dropdown-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .dropdown-active .dropdown-content {
+            max-height: 200px;
+        }
+        .dropdown-arrow {
+            transition: transform 0.3s ease;
+        }
+        .dropdown-active .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        #sidebar.sidebar-collapsed { width: 72px; }
+        #sidebar.sidebar-collapsed .logo-container { display: none; }
+        #sidebar.sidebar-collapsed .sidebar-header { justify-content: center; padding: 0; }
+        
+        #sidebar.sidebar-collapsed .sidebar-text {
+            width: 0;
+            opacity: 0;
+            margin-left: 0;
+            overflow: hidden;
+        }
+        #sidebar.sidebar-collapsed .nav-arrow { display: none; }
+        #sidebar.sidebar-collapsed .admin-label { display: none; }
+        #sidebar.sidebar-collapsed .dropdown-content { display: none; }
+    </style>
+</head>
+<body class="h-full font-sans text-sa-text antialiased flex overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="w-64 bg-sa-dark flex-shrink-0 flex flex-col sidebar-transition z-50">
+        <div class="h-16 flex items-center px-5 border-b border-white/5 justify-between sidebar-header">
+            <div class="flex items-center overflow-hidden logo-container">
+                <img src="{{ url_for('static', filename='img/logo.png') }}?v={{ range(1, 1000) | random }}" alt="Sousa Araújo" class="h-12 w-auto flex-shrink-0 object-contain">
+            </div>
+            <button onclick="toggleSidebar()" class="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-white transition-colors flex-shrink-0 rounded-lg hover:bg-white/5">
+                <i data-lucide="menu" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+            <a href="{{ url_for('index') }}" class="flex items-center px-2 py-2 rounded-lg group transition-colors {% if request.endpoint == 'index' %} bg-sa-wine text-white {% else %} text-slate-400 hover:bg-white/5 hover:text-white {% endif %}" title="Dashboard">
+                <div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="grid" class="w-4 h-4"></i>
+                </div>
+                <span class="ml-3 font-semibold text-xs whitespace-nowrap transition-all duration-300 sidebar-text">Dashboard</span>
+            </a>
+
+            <a href="{{ url_for('upload') }}" class="flex items-center px-2 py-2 rounded-lg group transition-colors {% if request.endpoint == 'upload' %} bg-sa-wine text-white {% else %} text-slate-400 hover:bg-white/5 hover:text-white {% endif %}" title="Gerar Comissões">
+                <div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                </div>
+                <span class="ml-3 font-semibold text-xs whitespace-nowrap transition-all duration-300 sidebar-text">Gerar Comissões</span>
+            </a>
+
+            <!-- Dropdown Menu -->
+            <div class="dropdown-group {% if request.endpoint in ['fila', 'arquivos'] %} dropdown-active {% endif %}">
+                <button onclick="toggleDropdown(this)" class="w-full flex items-center justify-between px-2 py-2 rounded-lg group transition-colors text-slate-400 hover:bg-white/5 hover:text-white" title="Operações">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                            <i data-lucide="layers" class="w-4 h-4"></i>
+                        </div>
+                        <span class="ml-3 font-semibold text-xs whitespace-nowrap transition-all duration-300 sidebar-text">Operações</span>
+                    </div>
+                    <i data-lucide="chevron-down" class="w-3 h-3 dropdown-arrow nav-arrow"></i>
+                </button>
+                <div class="dropdown-content pl-[3.25rem] space-y-1 mt-1">
+                    <a href="{{ url_for('fila') }}" class="block py-2 text-[11px] font-medium {% if request.endpoint == 'fila' %} text-sa-red {% else %} text-slate-500 hover:text-white {% endif %} transition-colors">Fila de Disparos</a>
+                    <a href="{{ url_for('arquivos') }}" class="block py-2 text-[11px] font-medium {% if request.endpoint == 'arquivos' %} text-sa-red {% else %} text-slate-500 hover:text-white {% endif %} transition-colors">Gerenciador PDFs</a>
+                </div>
+            </div>
+
+            <div class="pt-4 pb-2 px-4 admin-label">
+                <span class="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Administração</span>
+            </div>
+
+            <a href="{{ url_for('colaboradores') }}" class="flex items-center px-2 py-2 rounded-lg group transition-colors {% if request.endpoint == 'colaboradores' %} bg-sa-wine text-white {% else %} text-slate-400 hover:bg-white/5 hover:text-white {% endif %}" title="Corretores">
+                <div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                </div>
+                <span class="ml-3 font-semibold text-xs whitespace-nowrap transition-all duration-300 sidebar-text">Corretores</span>
+            </a>
+
+            <a href="{{ url_for('configuracoes') }}" class="flex items-center px-2 py-2 rounded-lg group transition-colors {% if request.endpoint == 'configuracoes' %} bg-sa-wine text-white {% else %} text-slate-400 hover:bg-white/5 hover:text-white {% endif %}" title="Configurações">
+                <div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="settings" class="w-4 h-4"></i>
+                </div>
+                <span class="ml-3 font-semibold text-xs whitespace-nowrap transition-all duration-300 sidebar-text">Configurações</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <header class="h-16 bg-white border-b border-sa-gray flex items-center justify-between px-8 flex-shrink-0">
+            <h2 class="text-sm font-bold text-sa-text uppercase tracking-wider">{% block header_title %}Dashboard{% endblock %}</h2>
+            <div class="flex items-center gap-4">
+                <div class="text-[10px] font-bold text-sa-muted flex items-center gap-2 bg-sa-gray px-3 py-1 rounded">
+                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                    SISTEMA ONLINE
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-8">
+            <div class="max-w-6xl mx-auto space-y-6">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="space-y-2">
+                            {% for category, message in messages %}
+                                <div class="p-3 text-xs font-bold rounded border {% if category == 'error' %} bg-red-50 text-red-700 border-red-100 {% else %} bg-emerald-50 text-emerald-700 border-emerald-100 {% endif %}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        
+        function toggleDropdown(btn) {
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar.classList.contains('sidebar-collapsed')) {
+                toggleSidebar();
+            }
+            const group = btn.closest('.dropdown-group');
+            group.classList.toggle('dropdown-active');
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('sidebar-collapsed');
+            
+            // Salvar estado no localStorage
+            localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('sidebar-collapsed'));
+        }
+
+        // Recuperar estado inicial
+        if (localStorage.getItem('sidebarCollapsed') === 'true') {
+            document.getElementById('sidebar').classList.add('sidebar-collapsed');
+        }
+    </script>
+</body>
+</html>

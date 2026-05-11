@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="bg-white border border-sa-gray p-6 rounded-lg shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <span class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Sucessos</span>
+            <div class="p-2 bg-emerald-50 text-emerald-600 rounded">
+                <i data-lucide="check" class="w-4 h-4"></i>
+            </div>
+        </div>
+        <h3 id="total-sucesso" class="text-3xl font-bold text-sa-text">{{ total_enviados }}</h3>
+        <p class="text-[10px] text-emerald-600 font-bold mt-2">E-mails entregues</p>
+    </div>
+
+    <div class="bg-white border border-sa-gray p-6 rounded-lg shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <span class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Erros</span>
+            <div class="p-2 bg-red-50 text-sa-red rounded">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </div>
+        </div>
+        <h3 id="total-erro" class="text-3xl font-bold text-sa-text">{{ total_erros }}</h3>
+        <p class="text-[10px] text-sa-red font-bold mt-2">Falhas registradas</p>
+    </div>
+
+    <div class="bg-white border border-sa-gray p-6 rounded-lg shadow-sm flex flex-col justify-between">
+        <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Histórico</span>
+            <button onclick="limparHistorico()" class="text-[10px] font-bold text-sa-red hover:underline">LIMPAR LOGS</button>
+        </div>
+        <div class="mt-4 flex items-center gap-2">
+            <div class="w-full h-1.5 bg-sa-gray rounded-full overflow-hidden">
+                <div class="h-full bg-sa-wine w-2/3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="bg-white border border-sa-gray rounded-lg shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-sa-gray bg-slate-50 flex justify-between items-center">
+        <h3 class="text-xs font-bold text-sa-text uppercase tracking-widest">Atividade Recente</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-sa-muted font-bold uppercase tracking-wider">
+                <tr>
+                    <th class="px-6 py-3 border-b border-sa-gray">Corretor</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">Tipo</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">Data</th>
+                    <th class="px-6 py-3 border-b border-sa-gray text-right">Status</th>
+                </tr>
+            </thead>
+            <tbody id="logs-tbody" class="divide-y divide-sa-gray">
+                {% for log in logs %}
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 font-semibold text-sa-text">{{ log.corretor.nome if log.corretor else 'Desconhecido' }}</td>
+                    <td class="px-6 py-4 text-sa-muted">{{ log.tipo }}</td>
+                    <td class="px-6 py-4 text-sa-muted">{{ log.data_envio.strftime('%d/%m/%Y %H:%M') }}</td>
+                    <td class="px-6 py-4 text-right">
+                        {% if log.status == 'Sucesso' %}
+                        <span class="px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">SUCESSO</span>
+                        {% else %}
+                        <span class="px-2 py-1 rounded bg-red-50 text-sa-red text-[10px] font-bold" title="{{ log.mensagem_erro }}">ERRO</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function updateDashboard() {
+    fetch('/api/status_envio').then(r => r.json()).then(data => {
+        document.getElementById('total-sucesso').innerText = data.concluidos;
+        document.getElementById('total-erro').innerText = data.erros;
+        const tbody = document.getElementById('logs-tbody');
+        if (data.logs && data.logs.length > 0) {
+            let html = '';
+            data.logs.forEach(log => {
+                const badge = log.status === 'Sucesso' 
+                    ? `<span class="px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">SUCESSO</span>`
+                    : `<span class="px-2 py-1 rounded bg-red-50 text-sa-red text-[10px] font-bold" title="${log.erro}">ERRO</span>`;
+                html += `<tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 font-semibold text-sa-text">${log.corretor}</td>
+                    <td class="px-6 py-4 text-sa-muted">${log.tipo}</td>
+                    <td class="px-6 py-4 text-sa-muted">${log.data}</td>
+                    <td class="px-6 py-4 text-right">${badge}</td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+    });
+}
+function limparHistorico() {
+    if (confirm('Limpar logs?')) fetch('/limpar_logs', {method:'POST'}).then(() => window.location.reload());
+}
+setInterval(updateDashboard, 5000);
+</script>
+{% endblock %}

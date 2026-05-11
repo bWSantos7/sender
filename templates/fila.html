@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block header_title %}Fila de Processamento{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="bg-white border border-sa-gray p-6 rounded-lg shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
+        <div>
+            <h3 class="text-sm font-bold text-sa-text uppercase tracking-widest">Controle de Envios</h3>
+            <p class="text-xs text-sa-muted mt-1 font-medium">Inicie o lote para disparar os e-mails.</p>
+        </div>
+        <div class="flex gap-3">
+            <button id="btn-iniciar" onclick="toggleEnvio()" class="px-6 py-2.5 bg-sa-wine text-white rounded text-xs font-bold uppercase tracking-widest hover:bg-sa-red transition-all flex items-center gap-2">
+                <i data-lucide="play" class="w-4 h-4"></i>
+                <span>Iniciar Lote</span>
+            </button>
+            <form action="{{ url_for('limpar_fila') }}" method="post" onsubmit="return confirm('Limpar fila?')">
+                <button type="submit" class="p-2.5 border border-sa-gray rounded text-sa-muted hover:text-sa-red hover:bg-red-50 transition-all">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="progress-container" class="hidden bg-white border border-sa-gray p-6 rounded-lg shadow-sm">
+        <div class="flex justify-between items-center mb-3">
+            <span class="text-[10px] font-bold text-sa-wine uppercase tracking-[0.2em]">Processando...</span>
+            <span id="progress-text" class="text-xl font-bold text-sa-text">0%</span>
+        </div>
+        <div class="h-2 bg-sa-gray rounded-full overflow-hidden">
+            <div id="progress-bar" class="h-full bg-sa-wine w-0 transition-all duration-500"></div>
+        </div>
+        <div class="grid grid-cols-4 gap-4 mt-6">
+            <div class="text-center">
+                <p class="text-[9px] font-bold text-sa-muted uppercase tracking-widest">Pendente</p>
+                <p id="stat-pendentes" class="text-sm font-bold text-sa-text">0</p>
+            </div>
+            <div class="text-center">
+                <p class="text-[9px] font-bold text-blue-500 uppercase tracking-widest">Enviando</p>
+                <p id="stat-processando" class="text-sm font-bold text-sa-text">0</p>
+            </div>
+            <div class="text-center">
+                <p class="text-[9px] font-bold text-emerald-500 uppercase tracking-widest">Sucesso</p>
+                <p id="stat-concluidos" class="text-sm font-bold text-sa-text">0</p>
+            </div>
+            <div class="text-center">
+                <p class="text-[9px] font-bold text-sa-red uppercase tracking-widest">Erro</p>
+                <p id="stat-erros" class="text-sm font-bold text-sa-text">0</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white border border-sa-gray rounded-lg shadow-sm overflow-hidden">
+        <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-sa-muted font-bold uppercase tracking-wider">
+                <tr>
+                    <th class="px-6 py-3 border-b border-sa-gray">Corretor</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">E-mail</th>
+                    <th class="px-6 py-3 border-b border-sa-gray text-right">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-sa-gray">
+                {% for item in fila %}
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 font-semibold text-sa-text">{{ item.fila.corretor_nome }}</td>
+                    <td class="px-6 py-4 text-sa-muted">{{ item.fila.destinatario_email }}</td>
+                    <td class="px-6 py-4 text-right">
+                        {% if item.fila.status == 'Pendente' %}
+                        <span class="text-slate-400 font-bold uppercase tracking-tighter">Fila</span>
+                        {% elif item.fila.status == 'Processando' %}
+                        <span class="text-blue-500 font-bold uppercase tracking-tighter animate-pulse">Enviando</span>
+                        {% elif item.fila.status == 'Concluido' %}
+                        <span class="text-emerald-500 font-bold uppercase tracking-tighter">OK</span>
+                        {% else %}
+                        <span class="text-sa-red font-bold uppercase tracking-tighter border-b border-sa-red border-dotted" title="{{ item.erro_msg }}">Erro</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let isRunning = false;
+function toggleEnvio() {
+    const route = isRunning ? '/parar_envios' : '/iniciar_envios';
+    fetch(route, { method: 'POST' }).then(r => r.json()).then(data => {
+        if (data.sucesso) {
+            isRunning = !isRunning;
+            updateButton(isRunning);
+            if(isRunning) document.getElementById('progress-container').classList.remove('hidden');
+        }
+    });
+}
+function updateButton(active) {
+    const btn = document.getElementById('btn-iniciar');
+    if (active) {
+        btn.classList.replace('bg-sa-wine', 'bg-sa-dark');
+        btn.innerHTML = '<i data-lucide="square" class="w-4 h-4"></i><span>Parar Lote</span>';
+    } else {
+        btn.classList.replace('bg-sa-dark', 'bg-sa-wine');
+        btn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i><span>Iniciar Lote</span>';
+    }
+    lucide.createIcons();
+}
+function updateStatus() {
+    fetch('/api/status_envio').then(r => r.json()).then(data => {
+        const total = data.total;
+        const concluidos = data.fila_concluidos;
+        const erros = data.fila_erros;
+        const progresso = total > 0 ? Math.round(((concluidos + erros) / total) * 100) : 0;
+        document.getElementById('progress-bar').style.width = progresso + '%';
+        document.getElementById('progress-text').innerText = progresso + '%';
+        document.getElementById('stat-pendentes').innerText = data.pendentes;
+        document.getElementById('stat-processando').innerText = data.processando;
+        document.getElementById('stat-concluidos').innerText = concluidos;
+        document.getElementById('stat-erros').innerText = erros;
+        if (data.ativo && !isRunning) { isRunning = true; updateButton(true); document.getElementById('progress-container').classList.remove('hidden'); }
+        else if (!data.ativo && isRunning) { isRunning = false; updateButton(false); }
+    });
+}
+setInterval(updateStatus, 3000);
+updateStatus();
+</script>
+{% endblock %}

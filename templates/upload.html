@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block header_title %}Importação de Planilha{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="bg-white border border-sa-gray rounded-lg shadow-sm p-10">
+        <div class="mb-8 border-b border-sa-gray pb-6">
+            <h3 class="text-lg font-bold text-sa-text">Processar Comissões</h3>
+            <p class="text-xs text-sa-muted mt-1">Selecione os parâmetros para geração dos arquivos PDF.</p>
+        </div>
+
+        <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" class="space-y-8" id="upload-form">
+            <div class="space-y-3">
+                <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">1. Tipo de Comissão</label>
+                <div class="grid grid-cols-3 gap-3">
+                    {% for tipo in ['Adiantamento', 'Repasse', 'Prêmio'] %}
+                    <label class="cursor-pointer">
+                        <input type="radio" name="tipo_envio" value="{{ tipo }}" class="peer sr-only" {% if loop.first %}checked{% endif %}>
+                        <div class="py-3 text-center border border-sa-gray rounded text-xs font-bold text-sa-muted peer-checked:bg-sa-wine peer-checked:text-white peer-checked:border-sa-wine transition-all hover:bg-slate-50">
+                            {{ tipo }}
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">2. Arquivo Base</label>
+                <div class="relative border-2 border-dashed border-sa-gray rounded-lg p-10 text-center hover:bg-slate-50 transition-colors group">
+                    <input type="file" name="planilha" id="planilha" accept=".xlsx, .xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required>
+                    <div class="flex flex-col items-center">
+                        <i data-lucide="upload" class="w-8 h-8 text-sa-gray mb-3 group-hover:text-sa-wine transition-colors"></i>
+                        <p id="file-name" class="text-sm font-bold text-sa-text">Selecione o arquivo Excel</p>
+                        <p class="text-[10px] text-sa-muted mt-1">Formatos suportados: .xlsx, .xls</p>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" id="submit-btn" class="w-full bg-sa-dark text-white font-bold py-4 rounded hover:bg-sa-wine transition-all flex items-center justify-center gap-2">
+                <i data-lucide="play" class="w-4 h-4"></i>
+                PROCESSAR DADOS
+            </button>
+        </form>
+
+        <div id="loading-state" class="hidden text-center py-10">
+            <div class="flex flex-col items-center">
+                <div class="w-10 h-10 border-2 border-sa-gray border-t-sa-wine rounded-full animate-spin mb-4"></div>
+                <p class="text-[10px] font-bold text-sa-wine uppercase tracking-widest animate-pulse">Gerando relatórios...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const fileInput = document.getElementById('planilha');
+    const fileNameDisplay = document.getElementById('file-name');
+    const form = document.getElementById('upload-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const loadingState = document.getElementById('loading-state');
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            fileNameDisplay.innerText = e.target.files[0].name;
+            fileNameDisplay.classList.add('text-sa-wine');
+        }
+    });
+
+    form.addEventListener('submit', () => {
+        submitBtn.classList.add('hidden');
+        loadingState.classList.remove('hidden');
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,7 @@
+__pycache__/
+instance/
+uploads/
+*.db
+.env
+.vscode/
+logo.png
