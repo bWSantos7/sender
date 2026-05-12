@@ -43,7 +43,9 @@
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-3">
                             <i data-lucide="file-text" class="w-4 h-4 text-slate-400"></i>
-                            <span class="font-semibold text-sa-text truncate max-w-[300px]">{{ arquivo.nome }}</span>
+                            <a href="{{ url_for('visualizar_arquivo', filename=arquivo.caminho) }}" target="_blank" class="font-semibold text-sa-text hover:text-sa-wine transition-colors truncate max-w-[400px]">
+                                {{ arquivo.nome }}
+                            </a>
                         </div>
                     </td>
                     <td class="px-6 py-4">

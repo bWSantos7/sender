@@ -14,10 +14,10 @@
             <div class="space-y-3">
                 <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">1. Tipo de Comissão</label>
                 <div class="grid grid-cols-3 gap-3">
-                    {% for tipo in ['Adiantamento', 'Repasse', 'Prêmio'] %}
+                    {% for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'House', 'Staff'] %}
                     <label class="cursor-pointer">
                         <input type="radio" name="tipo_envio" value="{{ tipo }}" class="peer sr-only" {% if loop.first %}checked{% endif %}>
-                        <div class="py-3 text-center border border-sa-gray rounded text-xs font-bold text-sa-muted peer-checked:bg-sa-wine peer-checked:text-white peer-checked:border-sa-wine transition-all hover:bg-slate-50">
+                        <div class="py-3 px-1 text-center border border-sa-gray rounded text-[10px] font-bold text-sa-muted peer-checked:bg-sa-wine peer-checked:text-white peer-checked:border-sa-wine transition-all hover:bg-slate-50">
                             {{ tipo }}
                         </div>
                     </label>

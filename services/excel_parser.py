@@ -10,6 +10,116 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
         with pd.ExcelFile(caminho_arquivo) as excel_file:
             abas = excel_file.sheet_names
             
+            # 1. Lógica para House e Staff (Via Aba de Dados Brutos)
+            if tipo_envio in ['House', 'Staff']:
+                aba_dados = None
+                for aba in abas:
+                    if 'comissoes_parti' in aba.lower():
+                        aba_dados = aba
+                        break
+                
+                if not aba_dados:
+                    raise ValueError("Aba de dados brutos (relatorios_comissoes_parti_CV) não encontrada.")
+                
+                df_raw = pd.read_excel(excel_file, sheet_name=aba_dados)
+                
+                # Garantir que as colunas existem
+                colunas_requeridas = ['Cargo', 'Beneficiário', 'Empreendimento Final', 'Identificador', 'Valor a Pagar']
+                for col in colunas_requeridas:
+                    if col not in df_raw.columns:
+                        raise ValueError(f"Coluna '{col}' não encontrada na aba {aba_dados}.")
+                
+                # Filtro de valor zerado ou nulo
+                df_raw = df_raw[df_raw['Valor a Pagar'].notna()]
+                df_raw['Valor a Pagar'] = pd.to_numeric(df_raw['Valor a Pagar'], errors='coerce').fillna(0)
+                df_raw = df_raw[df_raw['Valor a Pagar'] != 0]
+                
+                if tipo_envio == 'House':
+                    df_filtered = df_raw[df_raw['Cargo'].astype(str).str.strip() == 'Corretor']
+                else: # Staff
+                    df_filtered = df_raw[~df_raw['Cargo'].astype(str).str.strip().isin(['Corretor', 'Parceiro'])]
+                
+                if df_filtered.empty:
+                    raise ValueError(f"Nenhum dado encontrado para a categoria {tipo_envio} após os filtros de Cargo e Valor.")
+                
+                # Mapear para o formato flat
+                df_flat = df_filtered.rename(columns={
+                    'Beneficiário': 'BENEFICIARIO',
+                    'Empreendimento Final': 'EMPREENDIMENTO',
+                    'Identificador': 'UNIDADE',
+                    'Valor a Pagar': 'VALOR TOTAL'
+                })[['BENEFICIARIO', 'EMPREENDIMENTO', 'UNIDADE', 'VALOR TOTAL']]
+                
+                # Obter lista única de corretores
+                corretores_nomes = [str(x).strip() for x in df_flat['BENEFICIARIO'].dropna().unique() if str(x).strip()]
+                
+                # Obter os empreendimentos de cada corretor
+                empreendimentos_por_corretor = {}
+                for nome in corretores_nomes:
+                    emps = df_flat[df_flat['BENEFICIARIO'] == nome]['EMPREENDIMENTO'].dropna().unique().tolist()
+                    empreendimentos_por_corretor[nome] = ", ".join(str(e).strip() for e in emps if str(e).strip() != "nan")
+                
+                return {
+                    'sucesso': True,
+                    'dataframe': df_flat,
+                    'corretores': corretores_nomes,
+                    'empreendimentos_por_corretor': empreendimentos_por_corretor,
+                    'aba_lida': aba_dados
+                }
+
+            # 2. Lógica para Prêmio (Padrão Flat ou Pivot)
+            if tipo_envio == 'Prêmio':
+                aba_selecionada = None
+                # Primeiro tenta o padrão Flat (colunas diretas)
+                for aba in abas:
+                    df_temp = pd.read_excel(excel_file, sheet_name=aba, nrows=5)
+                    cols = [str(c).upper().strip() for c in df_temp.columns]
+                    tem_benef = any('BENEFIC' in c or 'NOME' in c or 'CORRETOR' in c for c in cols)
+                    tem_valor = any('VALOR' in c or 'PREMIO' in c or 'PRMIO' in c for c in cols)
+                    
+                    if tem_benef and tem_valor:
+                        aba_selecionada = aba
+                        break
+                
+                if aba_selecionada:
+                    df_flat_raw = pd.read_excel(excel_file, sheet_name=aba_selecionada)
+                    col_map = {}
+                    for c in df_flat_raw.columns:
+                        c_up = str(c).upper().strip()
+                        if 'BENEFIC' in c_up or 'NOME' in c_up or 'CORRETOR' in c_up: col_map['BENEFICIARIO'] = c
+                        elif 'EMPREEND' in c_up or 'PROJETO' in c_up: col_map['EMPREENDIMENTO'] = c
+                        elif 'UNIDADE' in c_up or 'IDENTIF' in c_up: col_map['UNIDADE'] = c
+                        elif 'VALOR' in c_up or 'PREMIO' in c_up or 'PRMIO' in c_up: col_map['VALOR TOTAL'] = c
+                    
+                    if 'BENEFICIARIO' in col_map and 'VALOR TOTAL' in col_map:
+                        df_flat_raw = df_flat_raw.dropna(subset=[col_map['BENEFICIARIO'], col_map['VALOR TOTAL']])
+                        df_flat_raw[col_map['VALOR TOTAL']] = pd.to_numeric(df_flat_raw[col_map['VALOR TOTAL']], errors='coerce').fillna(0)
+                        df_flat_raw = df_flat_raw[df_flat_raw[col_map['VALOR TOTAL']] > 0]
+                        
+                        df_flat = df_flat_raw.rename(columns={
+                            col_map['BENEFICIARIO']: 'BENEFICIARIO',
+                            col_map.get('EMPREENDIMENTO', 'EMPREENDIMENTO'): 'EMPREENDIMENTO',
+                            col_map.get('UNIDADE', 'UNIDADE'): 'UNIDADE',
+                            col_map['VALOR TOTAL']: 'VALOR TOTAL'
+                        })
+                        if 'EMPREENDIMENTO' not in df_flat.columns: df_flat['EMPREENDIMENTO'] = 'GERAL'
+                        if 'UNIDADE' not in df_flat.columns: df_flat['UNIDADE'] = '-'
+                        
+                        df_flat = df_flat[['BENEFICIARIO', 'EMPREENDIMENTO', 'UNIDADE', 'VALOR TOTAL']]
+                        corretores_nomes = [str(x).strip() for x in df_flat['BENEFICIARIO'].dropna().unique() if str(x).strip()]
+                        empreendimentos_por_corretor = {}
+                        for nome in corretores_nomes:
+                            emps_list = df_flat[df_flat['BENEFICIARIO'] == nome]['EMPREENDIMENTO'].dropna().unique().tolist()
+                            empreendimentos_por_corretor[nome] = ", ".join(str(e).strip() for e in emps_list if str(e).strip() != "nan")
+                        
+                        return {
+                            'sucesso': True,
+                            'dataframe': df_flat,
+                            'corretores': corretores_nomes,
+                            'empreendimentos_por_corretor': empreendimentos_por_corretor,
+                            'aba_lida': aba_selecionada
+                        }
+            
             aba_selecionada = None
             # Tenta achar correspondência exata primeiro
             aba_exata = f"Fechamento {tipo_envio}"

@@ -24,6 +24,16 @@ class Configuracao(db.Model):
     data_limite_envio = db.Column(db.String(100), nullable=True)
     data_pagamento = db.Column(db.String(100), nullable=True)
     mes_referencia = db.Column(db.String(50), nullable=True)
+    custom_message = db.Column(db.Text, nullable=True) # Mensagem principal
+    email_titulo = db.Column(db.String(300), nullable=True)
+    email_subtitulo = db.Column(db.String(300), nullable=True)
+    email_alerta_amarelo = db.Column(db.Text, nullable=True)
+    email_alerta_vermelho = db.Column(db.Text, nullable=True)
+    email_rodape = db.Column(db.Text, nullable=True)
+    email_cnpjs = db.Column(db.Text, nullable=True)
+    email_prazo = db.Column(db.Text, nullable=True)
+    email_retroativo_titulo = db.Column(db.String(200), nullable=True)
+    email_retroativo_texto = db.Column(db.Text, nullable=True)
 
 class EmailConfig(db.Model):
     id = db.Column(db.Integer, primary_key=True)

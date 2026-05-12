@@ -54,10 +54,10 @@ def index():
 def upload():
     if request.method == 'POST':
         tipo_envio = request.form.get('tipo_envio')
-        file = request.files.get('file')
+        file = request.files.get('planilha')
         
-        if not file or not file.filename.endswith('.xlsx'):
-            flash('Por favor, envie um arquivo Excel (.xlsx) válido.', 'error')
+        if not file or (not file.filename.endswith('.xlsx') and not file.filename.endswith('.xls')):
+            flash('Por favor, envie um arquivo Excel (.xlsx ou .xls) válido.', 'error')
             return redirect(url_for('upload'))
             
         caminho_temporario = os.path.join(app.root_path, 'uploads', 'temp.xlsx')
@@ -89,7 +89,8 @@ def upload():
             emps = resultado['empreendimentos_por_corretor'].get(corretor_nome, "")
             
             # Resolver email do destinatário
-            c = Corretor.query.filter_by(nome=corretor_nome).first()
+            corretor_nome_clean = corretor_nome.strip()
+            c = Corretor.query.filter(db.func.lower(Corretor.nome) == corretor_nome_clean.lower()).first()
             dest_email = c.email if c else None
             
             # Resolver emails dos supervisores em CC
@@ -97,7 +98,18 @@ def upload():
             if emps:
                 lista_emps = [e.strip() for e in emps.split(',')]
                 for emp in lista_emps:
-                    emp_sup = EmpreendimentoSupervisor.query.filter_by(empreendimento=emp).first()
+                    if not emp: continue
+                    # Busca robusta (Insensível a maiúsculas/minúsculas)
+                    emp_sup = EmpreendimentoSupervisor.query.filter(
+                        db.func.lower(EmpreendimentoSupervisor.empreendimento) == emp.lower()
+                    ).first()
+                    
+                    # Se não achar exato, tenta busca parcial (ex: "SAFIRA" achar "SAFIRA I")
+                    if not emp_sup:
+                        emp_sup = EmpreendimentoSupervisor.query.filter(
+                            EmpreendimentoSupervisor.empreendimento.ilike(f"%{emp}%")
+                        ).first()
+
                     if emp_sup:
                         if emp_sup.supervisor and '@' in emp_sup.supervisor and emp_sup.supervisor not in cc_emails_list:
                             cc_emails_list.append(emp_sup.supervisor.strip())
@@ -415,8 +427,8 @@ def limpar_fila():
 def atualizar_email():
     try:
         data = request.json
-        nome = data.get('nome')
-        email = data.get('email')
+        nome = data.get('nome', '').strip()
+        email = data.get('email', '').strip()
         
         if not nome or not email:
             return jsonify({'sucesso': False, 'erro': 'Nome e E-mail são obrigatórios.'}), 400
@@ -425,12 +437,12 @@ def atualizar_email():
         if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
             return jsonify({'sucesso': False, 'erro': 'Formato de e-mail inválido.'}), 400
             
-        # Buscar corretor
-        c = Corretor.query.filter_by(nome=nome).first()
+        # Buscar corretor (Busca robusta)
+        c = Corretor.query.filter(db.func.lower(Corretor.nome) == nome.lower()).first()
         criado_novo = False
         
         if not c:
-            # Criar novo corretor com supervisores vazios (nullable=True no banco)
+            # Criar novo corretor
             c = Corretor(nome=nome, email=email, supervisor='', supervisor2='')
             db.session.add(c)
             criado_novo = True
@@ -464,9 +476,15 @@ def configuracoes():
         db.session.add(email_conf)
         db.session.commit()
 
+    # Garantir que todos os tipos de configuração existem
+    for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'House', 'Staff']:
+        if not Configuracao.query.filter_by(tipo=tipo).first():
+            db.session.add(Configuracao(tipo=tipo))
+    db.session.commit()
+
     if request.method == 'POST':
         # Atualizar Links e Datas
-        for tipo in ['Adiantamento', 'Repasse', 'Prêmio']:
+        for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'House', 'Staff']:
             conf = Configuracao.query.filter_by(tipo=tipo).first()
             if not conf:
                 conf = Configuracao(tipo=tipo)
@@ -477,6 +495,12 @@ def configuracoes():
             conf.data_limite_envio = request.form.get(f'{tipo}_data_limite_envio')
             conf.data_pagamento = request.form.get(f'{tipo}_data_pagamento')
             conf.mes_referencia = request.form.get(f'{tipo}_mes_referencia')
+            conf.custom_message = request.form.get(f'{tipo}_custom_message')
+            conf.email_titulo = request.form.get(f'{tipo}_email_titulo')
+            conf.email_subtitulo = request.form.get(f'{tipo}_email_subtitulo')
+            conf.email_alerta_amarelo = request.form.get(f'{tipo}_email_alerta_amarelo')
+            conf.email_alerta_vermelho = request.form.get(f'{tipo}_email_alerta_vermelho')
+            conf.email_rodape = request.form.get(f'{tipo}_email_rodape')
             
         # Atualizar Config de Email
         if request.form.get('smtp_user'):
@@ -556,6 +580,15 @@ def excluir_arquivos():
             
     return jsonify({'sucesso': True, 'mensagem': f'{sucesso} arquivos excluídos, {erros} erros.'})
 
+@app.route('/api/visualizar_arquivo/<path:filename>')
+def visualizar_arquivo(filename):
+    from flask import send_file
+    base_uploads = os.path.join(app.root_path, 'uploads')
+    caminho = os.path.join(base_uploads, filename)
+    if os.path.exists(caminho):
+        return send_file(caminho)
+    return "Arquivo não encontrado", 404
+
 @app.route('/api/download_massa')
 def download_massa():
     import zipfile
@@ -589,41 +622,105 @@ def download_massa():
 @app.route('/api/editar_corretor', methods=['POST'])
 def editar_corretor():
     data = request.json
-    corretor = Corretor.query.get(data.get('id'))
-    if not corretor:
-        return jsonify({'sucesso': False, 'erro': 'Corretor não encontrado.'}), 404
+    corretor_id = data.get('id')
+    
+    if corretor_id:
+        corretor = Corretor.query.get(corretor_id)
+        if not corretor:
+            return jsonify({'sucesso': False, 'erro': 'Corretor não encontrado.'}), 404
+    else:
+        # Criar novo se não houver ID
+        corretor = Corretor()
+        db.session.add(corretor)
         
     corretor.nome = data.get('nome')
     corretor.email = data.get('email')
-    db.session.commit()
-    return jsonify({'sucesso': True})
+    
+    try:
+        db.session.commit()
+        return jsonify({'sucesso': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 @app.route('/api/editar_empreendimento', methods=['POST'])
 def editar_empreendimento():
     data = request.json
-    emp = EmpreendimentoSupervisor.query.get(data.get('id'))
-    if not emp:
-        return jsonify({'sucesso': False, 'erro': 'Empreendimento não encontrado.'}), 404
+    emp_id = data.get('id')
+    
+    if emp_id:
+        emp = EmpreendimentoSupervisor.query.get(emp_id)
+        if not emp:
+            return jsonify({'sucesso': False, 'erro': 'Empreendimento não encontrado.'}), 404
+    else:
+        # Criar novo se não houver ID
+        emp = EmpreendimentoSupervisor()
+        emp.empreendimento = data.get('empreendimento')
+        db.session.add(emp)
         
     emp.supervisor = data.get('supervisor')
     emp.supervisor2 = data.get('supervisor2')
-    db.session.commit()
-    return jsonify({'sucesso': True})
+    
+    try:
+        db.session.commit()
+        return jsonify({'sucesso': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+@app.route('/api/salvar_template', methods=['POST'])
+def salvar_template():
+    try:
+        data = request.json
+        tipo = data.get('tipo')
+        conf = Configuracao.query.filter_by(tipo=tipo).first()
+        if not conf:
+            conf = Configuracao(tipo=tipo)
+            db.session.add(conf)
+        
+        conf.email_titulo = data.get('titulo')
+        conf.email_subtitulo = data.get('subtitulo')
+        conf.email_alerta_amarelo = data.get('alerta_amarelo')
+        conf.email_alerta_vermelho = data.get('alerta_vermelho')
+        conf.custom_message = data.get('corpo')
+        conf.email_rodape = data.get('rodape')
+        conf.email_cnpjs = data.get('cnpjs')
+        conf.email_prazo = data.get('prazo')
+        conf.email_retroativo_titulo = data.get('retroativo_titulo')
+        conf.email_retroativo_texto = data.get('retroativo_texto')
+        
+        db.session.commit()
+        return jsonify({'sucesso': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 @app.route('/preview_email')
 def preview_email():
     tipo = request.args.get('tipo', 'Adiantamento')
     conf = Configuracao.query.filter_by(tipo=tipo).first()
+    
     config_dict = {
         'tipo': tipo,
         'link_form': conf.link_form if conf else '#',
         'link_form_retroativo': conf.link_form_retroativo if conf else '#',
-        'data_limite_envio': conf.data_limite_envio if conf else '',
-        'data_pagamento': conf.data_pagamento if conf else '',
-        'mes_referencia': conf.mes_referencia if conf else ''
+        'data_limite_envio': conf.data_limite_envio if conf else '15/05 às 15:59',
+        'data_pagamento': conf.data_pagamento if conf else '25 e 30',
+        'mes_referencia': conf.mes_referencia if conf else 'Maio 2026',
+        'custom_message': conf.custom_message if conf else None,
+        'email_titulo': conf.email_titulo if conf else None,
+        'email_subtitulo': conf.email_subtitulo if conf else None,
+        'email_alerta_amarelo': conf.email_alerta_amarelo if conf else None,
+        'email_alerta_vermelho': conf.email_alerta_vermelho if conf else None,
+        'email_rodape': conf.email_rodape if conf else None,
+        'email_cnpjs': conf.email_cnpjs if conf else None,
+        'email_prazo': conf.email_prazo if conf else None,
+        'email_retroativo_titulo': conf.email_retroativo_titulo if conf else None,
+        'email_retroativo_texto': conf.email_retroativo_texto if conf else None
     }
-    html = gerar_html_email("Nome do Corretor Teste", tipo, config_dict)
-    return html
+    
+    email_html = gerar_html_email("Nome do Corretor Teste", tipo, config_dict)
+    return render_template('preview_editor.html', email_html=email_html, tipo=tipo)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

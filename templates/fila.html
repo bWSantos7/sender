@@ -51,11 +51,13 @@
     </div>
 
     <div class="bg-white border border-sa-gray rounded-lg shadow-sm overflow-hidden">
-        <table class="w-full text-left text-xs">
+        <table class="w-full text-left text-[11px]">
             <thead class="bg-slate-50 text-sa-muted font-bold uppercase tracking-wider">
                 <tr>
                     <th class="px-6 py-3 border-b border-sa-gray">Corretor</th>
                     <th class="px-6 py-3 border-b border-sa-gray">E-mail</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">Tipo</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">Cópias (CC)</th>
                     <th class="px-6 py-3 border-b border-sa-gray text-right">Status</th>
                 </tr>
             </thead>
@@ -63,16 +65,31 @@
                 {% for item in fila %}
                 <tr class="hover:bg-slate-50 transition-colors">
                     <td class="px-6 py-4 font-semibold text-sa-text">{{ item.fila.corretor_nome }}</td>
-                    <td class="px-6 py-4 text-sa-muted">{{ item.fila.destinatario_email }}</td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-2 group">
+                            <input type="email" 
+                                   value="{{ item.fila.destinatario_email or '' }}" 
+                                   placeholder="Adicionar e-mail..."
+                                   onblur="salvarEmail('{{ item.fila.corretor_nome }}', this.value)"
+                                   class="bg-transparent border-b border-transparent focus:border-sa-wine focus:bg-white px-1 py-0.5 outline-none transition-all w-full {% if not item.fila.destinatario_email %} text-sa-red font-bold animate-pulse {% else %} text-sa-muted {% endif %}"
+                            >
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-0.5 bg-slate-100 text-sa-muted rounded font-bold uppercase text-[9px]">{{ item.fila.tipo }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-sa-muted truncate max-w-[200px]" title="{{ item.fila.cc_emails or '' }}">
+                        {{ item.fila.cc_emails or '-' }}
+                    </td>
                     <td class="px-6 py-4 text-right">
                         {% if item.fila.status == 'Pendente' %}
-                        <span class="text-slate-400 font-bold uppercase tracking-tighter">Fila</span>
+                        <span class="text-slate-400 font-bold uppercase tracking-tighter">Pendente</span>
                         {% elif item.fila.status == 'Processando' %}
                         <span class="text-blue-500 font-bold uppercase tracking-tighter animate-pulse">Enviando</span>
                         {% elif item.fila.status == 'Concluido' %}
-                        <span class="text-emerald-500 font-bold uppercase tracking-tighter">OK</span>
+                        <span class="text-emerald-500 font-bold uppercase tracking-tighter">Concluído</span>
                         {% else %}
-                        <span class="text-sa-red font-bold uppercase tracking-tighter border-b border-sa-red border-dotted" title="{{ item.erro_msg }}">Erro</span>
+                        <span class="text-sa-red font-bold uppercase tracking-tighter border-b border-sa-red border-dotted cursor-help" title="{{ item.erro_msg }}">Erro</span>
                         {% endif %}
                     </td>
                 </tr>
@@ -83,6 +100,23 @@
 </div>
 
 <script>
+function salvarEmail(nome, novoEmail) {
+    if (!novoEmail || !novoEmail.includes('@')) return;
+    
+    fetch('/api/atualizar_email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: nome, email: novoEmail })
+    }).then(r => r.json()).then(data => {
+        if (data.sucesso) {
+            console.log('Email atualizado para:', nome);
+            // Opcional: mostrar um pequeno toast de sucesso
+        } else {
+            alert('Erro ao atualizar e-mail: ' + data.erro);
+        }
+    });
+}
+
 let isRunning = false;
 function toggleEnvio() {
     const route = isRunning ? '/parar_envios' : '/iniciar_envios';

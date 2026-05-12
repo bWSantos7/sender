@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block header_title %}Editor de E-mail: {{ tipo }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="bg-white border border-sa-gray p-6 rounded-lg shadow-sm flex justify-between items-center">
+        <div>
+            <h3 class="text-sm font-bold text-sa-text uppercase tracking-widest">Editor Visual</h3>
+            <p class="text-xs text-sa-muted mt-1">Clique nos textos do e-mail abaixo para editar. <span class="text-sa-wine font-bold">Lembre-se de salvar!</span></p>
+        </div>
+        <button onclick="salvarAlteracoes()" id="btn-salvar" class="px-6 py-3 bg-sa-wine text-white rounded text-xs font-bold uppercase tracking-widest hover:bg-sa-red transition-all flex items-center gap-2">
+            <i data-lucide="save" class="w-4 h-4"></i>
+            SALVAR ALTERAÇÕES
+        </button>
+    </div>
+
+    <!-- Área do E-mail -->
+    <div class="bg-slate-100 p-8 rounded-lg border border-sa-gray flex justify-center">
+        <div id="email-container" class="bg-white shadow-2xl rounded-xl overflow-hidden" style="width: 760px; pointer-events: all;">
+            {{ email_html | safe }}
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Tornar elementos editáveis
+    const ids = [
+        'edit-titulo', 'edit-subtitulo', 'edit-alerta-amarelo', 'edit-alerta-vermelho', 
+        'edit-corpo', 'edit-conferencia', 'edit-cnpjs', 'edit-prazo', 
+        'edit-retroativo-titulo', 'edit-retroativo-texto', 'edit-rodape'
+    ];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.contentEditable = "true";
+            el.style.outline = "none";
+            el.style.cursor = "text";
+            el.classList.add('hover:bg-yellow-50');
+            el.title = "Clique para editar este texto";
+            
+            // Adicionar borda sutil ao focar
+            el.onfocus = () => el.style.boxShadow = "0 0 0 2px #7a0f0f33";
+            el.onblur = () => el.style.boxShadow = "none";
+        }
+    });
+});
+
+function salvarAlteracoes() {
+    const btn = document.getElementById('btn-salvar');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="animate-spin" data-lucide="loader-2"></i> SALVANDO...';
+    lucide.createIcons();
+
+    const data = {
+        tipo: '{{ tipo }}',
+        titulo: document.getElementById('edit-titulo')?.innerHTML || '',
+        subtitulo: document.getElementById('edit-subtitulo')?.innerHTML || '',
+        alerta_amarelo: document.getElementById('edit-alerta-amarelo')?.innerHTML || '',
+        alerta_vermelho: document.getElementById('edit-alerta-vermelho')?.innerHTML || '',
+        corpo: document.getElementById('edit-corpo')?.innerHTML || '',
+        cnpjs: document.getElementById('edit-cnpjs')?.innerHTML || '',
+        prazo: document.getElementById('edit-prazo')?.innerHTML || '',
+        retroativo_titulo: document.getElementById('edit-retroativo-titulo')?.innerHTML || '',
+        retroativo_texto: document.getElementById('edit-retroativo-texto')?.innerHTML || '',
+        rodape: document.getElementById('edit-rodape')?.innerHTML || ''
+    };
+
+    // Limpar o ⚠️ do alerta amarelo se o usuário deletou sem querer
+    if (data.alerta_amarelo.includes('⚠️')) {
+        data.alerta_amarelo = data.alerta_amarelo.replace(/<span.*?>⚠️<\/span>/, '').trim();
+    }
+
+    fetch('/api/salvar_template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.sucesso) {
+            btn.classList.replace('bg-sa-wine', 'bg-green-600');
+            btn.innerHTML = '<i data-lucide="check"></i> SALVO COM SUCESSO!';
+            lucide.createIcons();
+            setTimeout(() => {
+                btn.classList.replace('bg-green-600', 'bg-sa-wine');
+                btn.innerHTML = '<i data-lucide="save"></i> SALVAR ALTERAÇÕES';
+                btn.disabled = false;
+                lucide.createIcons();
+            }, 2000);
+        } else {
+            alert('Erro ao salvar: ' + res.erro);
+            btn.disabled = false;
+        }
+    });
+}
+</script>
+
+<style>
+[contenteditable="true"] {
+    transition: all 0.2s;
+    border-radius: 4px;
+    padding: 2px;
+}
+[contenteditable="true"]:hover {
+    background-color: rgba(250, 204, 21, 0.1);
+}
+</style>
+{% endblock %}

@@ -9,9 +9,15 @@
             <button onclick="switchTab('corretores')" id="tab-corretores" class="px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all bg-white shadow-sm text-sa-text">Corretores</button>
             <button onclick="switchTab('supervisores')" id="tab-supervisores" class="px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all text-sa-muted hover:text-sa-text">CC / Supervisores</button>
         </div>
-        <div class="relative w-full md:w-72">
-            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-sa-muted"></i>
-            <input type="text" id="search-input" onkeyup="filterUnified()" placeholder="BUSCAR..." class="w-full pl-9 pr-4 py-2 bg-white border border-sa-gray rounded text-xs font-bold focus:border-sa-wine transition-all">
+        <div class="flex items-center gap-3 w-full md:w-auto">
+            <div class="relative flex-1 md:w-72">
+                <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-sa-muted"></i>
+                <input type="text" id="search-input" onkeyup="filterUnified()" placeholder="BUSCAR..." class="w-full pl-9 pr-4 py-2 bg-white border border-sa-gray rounded text-xs font-bold focus:border-sa-wine transition-all">
+            </div>
+            <button onclick="abrirNovo()" class="px-4 py-2 bg-sa-dark text-white rounded text-[10px] font-bold uppercase tracking-widest hover:bg-sa-wine transition-all flex items-center gap-2">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                ADICIONAR
+            </button>
         </div>
     </div>
 
@@ -71,7 +77,7 @@
 <div id="modal-corretor" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6">
     <div class="fixed inset-0 bg-sa-dark/80 backdrop-blur-sm" onclick="fecharModal()"></div>
     <div class="relative bg-white rounded-lg w-full max-w-md p-8 shadow-2xl">
-        <h3 class="text-sm font-bold text-sa-text uppercase tracking-widest mb-6">Editar Corretor</h3>
+        <h3 id="modal-corretor-title" class="text-sm font-bold text-sa-text uppercase tracking-widest mb-6">Editar Corretor</h3>
         <input type="hidden" id="edit-id">
         <div class="space-y-4">
             <div class="space-y-1">
@@ -94,10 +100,15 @@
 <div id="modal-emp" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6">
     <div class="fixed inset-0 bg-sa-dark/80 backdrop-blur-sm" onclick="fecharModalEmp()"></div>
     <div class="relative bg-white rounded-lg w-full max-w-md p-8 shadow-2xl">
-        <h3 class="text-sm font-bold text-sa-text uppercase tracking-widest mb-2">Editar CCs</h3>
-        <p id="emp-nome-display" class="text-[11px] font-bold text-sa-wine uppercase mb-6"></p>
+        <h3 id="modal-emp-title" class="text-sm font-bold text-sa-text uppercase tracking-widest mb-6">Editar CCs</h3>
         <input type="hidden" id="edit-emp-id">
         <div class="space-y-4">
+            <div id="div-emp-nome" class="space-y-1">
+                <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Nome do Empreendimento</label>
+                <input type="text" id="edit-emp-nome" class="w-full h-11 px-4 bg-slate-50 border border-sa-gray rounded text-sm font-medium focus:border-sa-wine transition-all">
+            </div>
+            <p id="emp-nome-display" class="hidden text-[11px] font-bold text-sa-wine uppercase mb-4"></p>
+            
             <div class="space-y-1">
                 <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Supervisor 1</label>
                 <input type="text" id="edit-sup1" class="w-full h-11 px-4 bg-slate-50 border border-sa-gray rounded text-sm font-medium focus:border-sa-wine transition-all">
@@ -132,6 +143,24 @@ function switchTab(tab) {
         tabC.className = "px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all text-sa-muted hover:text-sa-text";
     }
 }
+function abrirNovo() {
+    if (currentTab === 'corretores') {
+        document.getElementById('modal-corretor-title').innerText = 'Adicionar Corretor';
+        document.getElementById('edit-id').value = '';
+        document.getElementById('edit-nome').value = '';
+        document.getElementById('edit-email').value = '';
+        document.getElementById('modal-corretor').classList.remove('hidden');
+    } else {
+        document.getElementById('modal-emp-title').innerText = 'Adicionar Empreendimento';
+        document.getElementById('edit-emp-id').value = '';
+        document.getElementById('edit-emp-nome').value = '';
+        document.getElementById('div-emp-nome').classList.remove('hidden');
+        document.getElementById('emp-nome-display').classList.add('hidden');
+        document.getElementById('edit-sup1').value = '';
+        document.getElementById('edit-sup2').value = '';
+        document.getElementById('modal-emp').classList.remove('hidden');
+    }
+}
 function filterUnified() {
     const filter = document.getElementById('search-input').value.toUpperCase();
     const tableId = currentTab === 'corretores' ? 'table-corretores' : 'table-supervisores';
@@ -146,6 +175,7 @@ function filterUnified() {
     }
 }
 function abrirModalEdicao(id, nome, email) {
+    document.getElementById('modal-corretor-title').innerText = 'Editar Corretor';
     document.getElementById('edit-id').value = id;
     document.getElementById('edit-nome').value = nome;
     document.getElementById('edit-email').value = email;
@@ -153,20 +183,46 @@ function abrirModalEdicao(id, nome, email) {
 }
 function fecharModal() { document.getElementById('modal-corretor').classList.add('hidden'); }
 function salvarCorretor() {
-    const data = { id: document.getElementById('edit-id').value, nome: document.getElementById('edit-nome').value, email: document.getElementById('edit-email').value };
-    fetch('/api/editar_corretor', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }).then(() => window.location.reload());
+    const data = { 
+        id: document.getElementById('edit-id').value, 
+        nome: document.getElementById('edit-nome').value, 
+        email: document.getElementById('edit-email').value 
+    };
+    fetch('/api/editar_corretor', { 
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'}, 
+        body: JSON.stringify(data) 
+    }).then(r => r.json()).then(res => {
+        if (res.sucesso) window.location.reload();
+        else alert('Erro: ' + res.erro);
+    });
 }
 function abrirModalEmp(id, nome, sup1, sup2) {
+    document.getElementById('modal-emp-title').innerText = 'Editar CCs';
     document.getElementById('edit-emp-id').value = id;
+    document.getElementById('div-emp-nome').classList.add('hidden');
     document.getElementById('emp-nome-display').innerText = nome;
+    document.getElementById('emp-nome-display').classList.remove('hidden');
     document.getElementById('edit-sup1').value = sup1;
     document.getElementById('edit-sup2').value = sup2;
     document.getElementById('modal-emp').classList.remove('hidden');
 }
 function fecharModalEmp() { document.getElementById('modal-emp').classList.add('hidden'); }
 function salvarEmp() {
-    const data = { id: document.getElementById('edit-emp-id').value, supervisor: document.getElementById('edit-sup1').value, supervisor2: document.getElementById('edit-sup2').value };
-    fetch('/api/editar_empreendimento', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) }).then(() => window.location.reload());
+    const data = { 
+        id: document.getElementById('edit-emp-id').value, 
+        empreendimento: document.getElementById('edit-emp-nome').value,
+        supervisor: document.getElementById('edit-sup1').value, 
+        supervisor2: document.getElementById('edit-sup2').value 
+    };
+    fetch('/api/editar_empreendimento', { 
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'}, 
+        body: JSON.stringify(data) 
+    }).then(r => r.json()).then(res => {
+        if (res.sucesso) window.location.reload();
+        else alert('Erro: ' + res.erro);
+    });
 }
 </script>
 {% endblock %}
