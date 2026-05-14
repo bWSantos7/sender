@@ -59,6 +59,7 @@
                     <th class="px-6 py-3 border-b border-sa-gray">Tipo</th>
                     <th class="px-6 py-3 border-b border-sa-gray">Cópias (CC)</th>
                     <th class="px-6 py-3 border-b border-sa-gray text-right">Status</th>
+                    <th class="px-6 py-3 border-b border-sa-gray text-right">Ações</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-sa-gray">
@@ -91,6 +92,19 @@
                         {% else %}
                         <span class="text-sa-red font-bold uppercase tracking-tighter border-b border-sa-red border-dotted cursor-help" title="{{ item.erro_msg }}">Erro</span>
                         {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-right flex justify-end gap-2">
+                        <a href="/api/visualizar_arquivo/{{ item.fila.tipo|lower }}/{{ item.fila.caminho_pdf.split('\\')[-1].split('/')[-1] }}" 
+                           target="_blank"
+                           class="p-2 text-sa-muted hover:text-sa-wine transition-all"
+                           title="Visualizar PDF">
+                            <i data-lucide="file-text" class="w-4 h-4"></i>
+                        </a>
+                        <button onclick="enviarUnidade('{{ item.fila.id }}', this)" 
+                                class="p-2 text-sa-muted hover:text-sa-wine transition-all"
+                                title="Enviar este e-mail agora">
+                            <i data-lucide="send" class="w-4 h-4"></i>
+                        </button>
                     </td>
                 </tr>
                 {% endfor %}
@@ -157,5 +171,34 @@ function updateStatus() {
 }
 setInterval(updateStatus, 3000);
 updateStatus();
+function enviarUnidade(id, btn) {
+    const icon = btn.querySelector('i');
+    const originalContent = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin text-sa-wine"></i>';
+    lucide.createIcons();
+    
+    fetch('/api/enviar_unidade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    }).then(r => r.json()).then(data => {
+        if (data.sucesso) {
+            btn.innerHTML = '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-500"></i>';
+        } else {
+            alert('Erro no envio individual: ' + data.erro);
+            btn.innerHTML = originalContent;
+        }
+        btn.disabled = false;
+        lucide.createIcons();
+        updateStatus();
+    }).catch(err => {
+        alert('Erro de conexão.');
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+        lucide.createIcons();
+    });
+}
 </script>
 {% endblock %}

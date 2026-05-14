@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+
+{% block title %}Anotações Internas{% endblock %}
+
+{% block content %}
+<style>
+    /* Força largura total */
+    .max-w-6xl { max-width: 100% !important; margin: 0 !important; padding: 0 20px !important; }
+    
+    .spreadsheet-wrapper {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 120px);
+        background: #f9fafb;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Área da Planilha */
+    .spreadsheet-container {
+        flex: 1;
+        overflow: auto;
+        background: white;
+    }
+
+    table.excel-style {
+        border-collapse: collapse;
+        width: max-content;
+        min-width: 100%;
+    }
+
+    table.excel-style th {
+        background: #f3f4f6;
+        color: #4b5563;
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        border: 1px solid #d1d5db;
+        padding: 0;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        min-width: 80px;
+        height: 35px;
+    }
+
+    .th-content {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        padding: 0 10px;
+        position: relative;
+    }
+
+    .resizer {
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: 5px;
+        cursor: col-resize;
+        user-select: none;
+        height: 100%;
+        z-index: 20;
+    }
+
+    .resizer:hover, .resizing { border-right: 3px solid #720917; }
+
+    :root { --cell-padding: 12px; }
+
+    table.excel-style td { border: 1px solid #e5e7eb; padding: 0; }
+
+    .cell-input {
+        width: 100%;
+        height: 100%;
+        border: none;
+        padding: var(--cell-padding) 12px;
+        font-size: 14px;
+        outline: none;
+        background: transparent;
+        transition: padding 0.2s ease;
+    }
+
+    .cell-input:focus { background: white; box-shadow: inset 0 0 0 2px #720917; z-index: 5; }
+
+    /* Barra de Ferramentas Topo */
+    .top-toolbar {
+        background: white;
+        padding: 12px 20px;
+        border-bottom: 1px solid #d1d5db;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .status-nota-enviada { background-color: #dcfce7 !important; color: #166534; }
+    .status-aguardando { background-color: #fef9c3 !important; color: #854d0e; }
+    .status-prazo { background-color: #dbeafe !important; color: #1e40af; }
+    .status-erro { background-color: #fee2e2 !important; color: #991b1b; }
+
+    /* Estilo do Seletor de Planilha */
+    .sheet-selector {
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 700;
+        color: #374151;
+        cursor: pointer;
+        outline: none;
+        min-width: 250px;
+        transition: all 0.2s;
+    }
+    .sheet-selector:hover { border-color: #720917; }
+</style>
+
+<div class="mb-4 px-4 flex justify-between items-center">
+    <h1 class="text-2xl font-black text-sa-wine tracking-tight">Anotações</h1>
+    
+        <div class="flex items-center gap-3">
+            <!-- Seletor de Planilha -->
+            <select id="select-planilha" onchange="carregarPlanilha(this.value)" class="sheet-selector shadow-sm">
+                <option value="" disabled selected>Selecionar Planilha...</option>
+                {% for a in anotacoes %}
+                    <option value="{{ a.id }}">{{ a.titulo }}</option>
+                {% endfor %}
+            </select>
+
+            <!-- Botão Adicionar (Admin Only) -->
+            {% if current_user.role == 'admin' %}
+            <button onclick="novaPlanilha()" class="bg-sa-wine text-white w-10 h-10 rounded-lg flex items-center justify-center hover:bg-sa-wine/90 transition-all shadow-md" title="Nova Planilha">
+                <i data-lucide="plus" class="w-6 h-6"></i>
+            </button>
+            {% endif %}
+        </div>
+</div>
+
+<div class="spreadsheet-wrapper">
+    <!-- Toolbar -->
+    <div class="top-toolbar">
+        <div class="flex items-center gap-4 flex-1">
+            {% if current_user.role == 'admin' %}
+            <button id="btn-edit" onclick="toggleEditMode()" class="p-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-all shadow-sm shrink-0" title="Editar">
+                <i data-lucide="pencil" id="icon-edit" class="w-5 h-5 text-gray-600"></i>
+            </button>
+            {% endif %}
+            <input type="text" id="planilha-titulo" disabled class="bg-transparent font-bold text-gray-800 text-xl border-none outline-none focus:ring-0 flex-1" placeholder="Título da Planilha">
+            <span id="save-status" class="text-[10px] font-black text-emerald-500 opacity-0 shrink-0">✓ SALVO</span>
+        </div>
+        
+        <div id="controles-edicao" class="flex items-center gap-2 opacity-0 pointer-events-none transition-all">
+            <button onclick="toggleRowHeight()" class="text-[11px] font-bold text-gray-600 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2" title="Ajustar Altura das Linhas">
+                <i data-lucide="stretch-vertical" class="w-3.5 h-3.5"></i> ALTURA
+            </button>
+            <button onclick="adicionarColuna()" class="text-[11px] font-bold text-gray-600 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2">
+                <i data-lucide="plus" class="w-3 h-3"></i> Coluna
+            </button>
+            <button onclick="adicionarLinha()" class="text-[11px] font-bold text-gray-600 px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2">
+                <i data-lucide="list-plus" class="w-3 h-3"></i> Linha
+            </button>
+            <button onclick="salvarAtual()" class="bg-sa-wine text-white px-5 py-2 rounded-lg font-bold text-xs shadow-md hover:bg-sa-wine/90 flex items-center gap-2">
+                <i data-lucide="save" class="w-3.5 h-3.5"></i> Salvar
+            </button>
+        </div>
+    </div>
+
+    <!-- Tabela -->
+    <div class="spreadsheet-container" id="editor-container">
+        <div id="editor-vazio" class="p-32 text-center {% if anotacoes %}hidden{% endif %}">
+            <i data-lucide="file-spreadsheet" class="w-16 h-16 text-gray-200 mx-auto mb-6"></i>
+            <h2 class="text-xl font-bold text-gray-400">Nenhuma planilha aberta</h2>
+            <p class="text-gray-400 mt-2">Selecione no menu acima ou crie uma nova.</p>
+        </div>
+        <table class="excel-style hidden" id="main-table">
+            <thead><tr id="table-head"></tr></thead>
+            <tbody id="table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Dados das Planilhas -->
+<div id="data-storage" class="hidden">
+    {% for a in anotacoes %}
+    <script type="application/json" id="data-{{ a.id }}">
+        {
+            "id": {{ a.id|tojson }},
+            "titulo": {{ a.titulo|tojson }},
+            "colunas": {{ a.colunas|tojson }},
+            "dados": {{ a.dados|tojson }},
+            "layout": {{ a.layout|tojson }}
+        }
+    </script>
+    {% endfor %}
+</div>
+
+<script>
+console.log('Script Anotações carregado.');
+let currentId = null;
+let currentCols = [];
+let currentRows = [];
+let isEditing = false;
+let colWidths = {};
+
+function initResize(e, idx) {
+    const th = e.target.parentElement.parentElement;
+    const startX = e.pageX;
+    const startWidth = th.offsetWidth;
+    function onMouseMove(moveE) {
+        const newWidth = startWidth + (moveE.pageX - startX);
+        th.style.width = newWidth + 'px';
+        colWidths[idx] = newWidth;
+    }
+    function onMouseUp() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+    }
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+}
+
+let currentHeightLevel = 1;
+const heightPaddings = ['4px', '12px', '24px'];
+function toggleRowHeight() {
+    currentHeightLevel = (currentHeightLevel + 1) % 3;
+    document.documentElement.style.setProperty('--cell-padding', heightPaddings[currentHeightLevel]);
+}
+
+const STATUS_OPTIONS = ["Aguardando Envio", "Nota enviada", "Enviada após o prazo", "Erro Pendente"];
+function getStatusClass(val) {
+    if (val === "Nota enviada") return "status-nota-enviada";
+    if (val === "Aguardando Envio") return "status-aguardando";
+    if (val === "Enviada após o prazo") return "status-prazo";
+    if (val === "Erro Pendente") return "status-erro";
+    return "";
+}
+
+function toggleEditMode() {
+    isEditing = !isEditing;
+    const btn = document.getElementById('btn-edit');
+    const controles = document.getElementById('controles-edicao');
+    const tituloInput = document.getElementById('planilha-titulo');
+    if (isEditing) {
+        btn.classList.add('bg-sa-wine', 'border-sa-wine');
+        document.getElementById('icon-edit').classList.replace('text-gray-600', 'text-white');
+        controles.classList.remove('opacity-0', 'pointer-events-none');
+        tituloInput.disabled = false;
+    } else {
+        btn.classList.remove('bg-sa-wine', 'border-sa-wine');
+        document.getElementById('icon-edit').classList.replace('text-white', 'text-gray-600');
+        controles.classList.add('opacity-0', 'pointer-events-none');
+        tituloInput.disabled = true;
+    }
+    renderTable();
+}
+
+function renderTable() {
+    const head = document.getElementById('table-head');
+    const body = document.getElementById('table-body');
+    const table = document.getElementById('main-table');
+    const vazio = document.getElementById('editor-vazio');
+    if (currentCols.length === 0) { table.classList.add('hidden'); vazio.classList.remove('hidden'); return; }
+    table.classList.remove('hidden'); vazio.classList.add('hidden');
+    
+    head.innerHTML = currentCols.map((col, idx) => `
+        <th style="width: ${colWidths[idx] || 180}px">
+            <div class="th-content">
+                <input type="text" value="${col}" ${!isEditing ? 'disabled' : ''} onchange="renameCol(${idx}, this.value)" class="bg-transparent border-none w-full text-center font-bold text-gray-700 outline-none">
+                ${isEditing ? `<button onclick="removeCol(${idx})" class="absolute right-4 top-1/2 -translate-y-1/2 text-red-400 hover:text-red-600"><i data-lucide="x" class="w-3 h-3"></i></button>` : ''}
+                <div class="resizer" onmousedown="initResize(event, ${idx})"></div>
+            </div>
+        </th>
+    `).join('') + (isEditing ? '<th class="w-10"></th>' : '');
+
+    body.innerHTML = currentRows.map((row, rIdx) => `
+        <tr>
+            ${currentCols.map(col => {
+                const val = row[col] || '';
+                if (col.toUpperCase() === 'SITUAÇÃO') {
+                    return `<td><select ${!isEditing ? 'disabled' : ''} onchange="updateCell(${rIdx}, '${col}', this.value)" class="cell-select ${getStatusClass(val)}"><option value="">-</option>${STATUS_OPTIONS.map(opt => `<option value="${opt}" ${val === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select></td>`;
+                }
+                return `<td><input type="text" value="${val}" ${!isEditing ? 'disabled' : ''} onchange="updateCell(${rIdx}, '${col}', this.value)" onpaste="handlePaste(event, ${rIdx}, '${col}')" class="cell-input"></td>`;
+            }).join('')}
+            ${isEditing ? `<td class="text-center"><button onclick="removeRow(${rIdx})" class="text-gray-400 hover:text-red-500"><i data-lucide="minus" class="w-4 h-4"></i></button></td>` : ''}
+        </tr>
+    `).join('');
+    try {
+        lucide.createIcons();
+    } catch (e) {
+        console.warn('Erro ao criar ícones Lucide:', e);
+    }
+}
+
+function carregarPlanilha(id) {
+    if (!id) return;
+    const dataEl = document.getElementById(`data-${id}`);
+    if (!dataEl) { console.error('Data element not found for ID:', id); return; }
+    
+    try {
+        const data = JSON.parse(dataEl.innerHTML);
+        console.log('Carregando planilha:', data);
+        
+        currentId = data.id;
+        currentCols = data.colunas || [];
+        currentRows = data.dados || [];
+        const layout = data.layout || {};
+        
+        colWidths = layout.colWidths || {};
+        currentHeightLevel = layout.heightLevel || 1;
+        
+        document.documentElement.style.setProperty('--cell-padding', heightPaddings[currentHeightLevel]);
+        document.getElementById('planilha-titulo').value = data.titulo;
+        document.getElementById('select-planilha').value = id;
+        
+        isEditing = false;
+        const btnEdit = document.getElementById('btn-edit');
+        if (btnEdit) btnEdit.classList.remove('bg-sa-wine', 'border-sa-wine');
+        
+        const controles = document.getElementById('controles-edicao');
+        if (controles) controles.classList.add('opacity-0', 'pointer-events-none');
+        
+        document.getElementById('planilha-titulo').disabled = true;
+        renderTable();
+    } catch (e) {
+        console.error('Erro geral ao carregar planilha:', e);
+    }
+}
+
+function handlePaste(e, startRow, startCol) {
+    if (!isEditing) return;
+    e.preventDefault();
+    const pastedData = (e.clipboardData || window.clipboardData).getData('text');
+    const lines = pastedData.split(/\r?\n/);
+    let startColIdx = currentCols.indexOf(startCol);
+    lines.forEach((line, lineIdx) => {
+        if (!line.trim() && lineIdx === lines.length - 1) return;
+        const cells = line.split('\t');
+        const tRowIdx = startRow + lineIdx;
+        while (currentRows.length <= tRowIdx) { const nr = {}; currentCols.forEach(c => nr[c] = ''); currentRows.push(nr); }
+        cells.forEach((text, cIdx) => {
+            const tColIdx = startColIdx + cIdx;
+            if (tColIdx < currentCols.length) currentRows[tRowIdx][currentCols[tColIdx]] = text.trim();
+        });
+    });
+    renderTable();
+}
+
+function renameCol(idx, val) { const old = currentCols[idx]; currentCols[idx] = val; currentRows.forEach(r => { r[val] = r[old]; delete r[old]; }); renderTable(); }
+function removeCol(idx) { if(currentCols.length <= 1) return; currentRows.forEach(r => delete r[currentCols[idx]]); currentCols.splice(idx, 1); renderTable(); }
+function updateCell(rIdx, col, val) { currentRows[rIdx][col] = val; }
+function adicionarColuna() { currentCols.push('Nova Coluna'); currentRows.forEach(r => r['Nova Coluna'] = ''); renderTable(); }
+function adicionarLinha() { const nr = {}; currentCols.forEach(c => nr[c] = ''); currentRows.push(nr); renderTable(); }
+function removeRow(idx) { currentRows.splice(idx, 1); renderTable(); }
+
+function novaPlanilha() {
+    currentId = null;
+    currentCols = ['Data', 'Nome', 'Situação', 'Observação'];
+    currentRows = [{}, {}, {}, {}];
+    currentRows.forEach(r => currentCols.forEach(c => r[c] = ''));
+    document.getElementById('planilha-titulo').value = 'Nova Planilha';
+    document.getElementById('select-planilha').value = "";
+    isEditing = true;
+    renderTable();
+    toggleEditMode(); isEditing = true;
+}
+
+function salvarAtual() {
+    const titulo = document.getElementById('planilha-titulo').value;
+    const payload = { id: currentId, titulo, colunas: currentCols, dados: currentRows, layout: { colWidths, heightLevel: currentHeightLevel } };
+    fetch('/api/anotacoes', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    }).then(r => r.json()).then(data => {
+        if(data.sucesso) {
+            currentId = data.id;
+            const status = document.getElementById('save-status');
+            status.style.opacity = '1'; setTimeout(() => status.style.opacity = '0', 3000);
+            isEditing = false; toggleEditMode();
+            if(!payload.id) window.location.reload();
+        }
+    });
+}
+
+function excluirAtual() {
+    if(currentId && confirm('Excluir esta planilha permanentemente?')) {
+        fetch(`/api/anotacoes/${currentId}`, { method: 'DELETE' }).then(() => window.location.reload());
+    }
+}
+
+window.onload = () => {
+    const selector = document.getElementById('select-planilha');
+    if (selector.options.length > 1) {
+        selector.selectedIndex = 1;
+        carregarPlanilha(selector.value);
+    }
+};
+</script>
+{% endblock %}

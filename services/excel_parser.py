@@ -68,7 +68,7 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
                 }
 
             # 2. Lógica para Prêmio (Padrão Flat ou Pivot)
-            if tipo_envio == 'Prêmio':
+            if tipo_envio in ['Prêmio', 'Premiação - Metas']:
                 aba_selecionada = None
                 # Primeiro tenta o padrão Flat (colunas diretas)
                 for aba in abas:

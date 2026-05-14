@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Links e Prazos{% endblock %}
+{% block header_title %}LINKS DOS FORMULÁRIOS{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-end mb-6">
+    <div>
+        <h2 class="text-2xl font-black text-sa-wine tracking-tight">Formulários e Prazos</h2>
+        <p class="text-xs text-sa-muted mt-1">Acesse e gerencie os links oficiais da sua regional.</p>
+    </div>
+    {% if current_user.role == 'admin' %}
+    <button onclick="document.getElementById('modal-link').classList.remove('hidden')" class="bg-sa-wine text-white px-5 py-2.5 rounded-xl text-xs font-bold shadow-lg hover:shadow-sa-wine/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center gap-2">
+        <i data-lucide="link-2" class="w-4 h-4"></i> CADASTRAR LINK
+    </button>
+    {% endif %}
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for l in links %}
+    <div class="bg-white rounded-2xl shadow-sm border border-sa-gray hover:shadow-md transition-all group overflow-hidden flex flex-col">
+        <div class="p-6 flex-1">
+            <div class="flex justify-between items-start mb-4">
+                <div class="w-10 h-10 bg-sa-wine/5 rounded-xl flex items-center justify-center text-sa-wine group-hover:bg-sa-wine group-hover:text-white transition-all duration-300">
+                    <i data-lucide="file-text" class="w-5 h-5"></i>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded text-[9px] font-black {% if l.status == 'Ativo' %} bg-emerald-100 text-emerald-700 {% else %} bg-red-100 text-red-700 {% endif %}">
+                        {{ l.status|upper }}
+                    </span>
+                    {% if current_user.role == 'admin' %}
+                    <form action="{{ url_for('excluir_link', id=l.id) }}" method="POST" onsubmit="return confirm('Excluir este link?')">
+                        <button type="submit" class="text-sa-muted hover:text-red-500 transition-colors">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <h3 class="font-bold text-sa-text mb-1">{{ l.nome }}</h3>
+            <p class="text-[10px] font-bold text-sa-wine uppercase mb-4">{{ l.regional }}</p>
+            
+            <div class="space-y-3 pt-4 border-t border-sa-gray">
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-sa-muted font-medium flex items-center gap-1.5">
+                        <i data-lucide="calendar-plus" class="w-3.5 h-3.5"></i> Abertura:
+                    </span>
+                    <span class="font-bold text-sa-text">{{ l.prazo_abertura or '-' }}</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-sa-muted font-medium flex items-center gap-1.5">
+                        <i data-lucide="calendar-x" class="w-3.5 h-3.5"></i> Fechamento:
+                    </span>
+                    <span class="font-bold text-red-600">{{ l.prazo_encerramento or '-' }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-4 bg-gray-50 flex gap-2">
+            <button onclick="copiarLink('{{ l.link }}', this)" class="flex-1 bg-white border border-sa-gray py-2.5 rounded-xl text-xs font-bold text-sa-text hover:bg-sa-gray transition-all flex items-center justify-center gap-2 shadow-sm">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i> <span>COPIAR LINK</span>
+            </button>
+            <a href="{{ l.link }}" target="_blank" class="w-10 h-10 bg-sa-wine/10 text-sa-wine rounded-xl flex items-center justify-center hover:bg-sa-wine hover:text-white transition-all shadow-sm">
+                <i data-lucide="external-link" class="w-4 h-4"></i>
+            </a>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-span-full py-20 text-center bg-white rounded-3xl border border-dashed border-sa-gray">
+        <i data-lucide="link-2-off" class="w-16 h-16 text-gray-200 mx-auto mb-4"></i>
+        <h3 class="text-xl font-bold text-gray-400">Nenhum link cadastrado</h3>
+        <p class="text-sa-muted text-sm mt-1">Links para sua regional aparecerão aqui.</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Modal Novo Link -->
+{% if current_user.role == 'admin' %}
+<div id="modal-link" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div class="p-6 border-b border-sa-gray bg-sa-wine text-white">
+            <h3 class="text-lg font-bold">Cadastrar Novo Formulário</h3>
+            <p class="text-xs opacity-80">Defina o nome, link e prazos do formulário.</p>
+        </div>
+        <form action="{{ url_for('novo_link') }}" method="POST" class="p-6 space-y-4">
+            <div>
+                <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Nome do Formulário</label>
+                <input type="text" name="nome" required placeholder="Ex: Adiantamento de Comissão" class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">URL do Link</label>
+                <input type="url" name="link" required placeholder="https://forms.gle/..." class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Prazo Abertura</label>
+                    <input type="text" name="prazo_abertura" placeholder="Ex: 01/05 às 08:00" class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Prazo Fechamento</label>
+                    <input type="text" name="prazo_encerramento" placeholder="Ex: 15/05 às 16:00" class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Regional</label>
+                <select name="regional" required class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+                    <option value="" disabled selected>Selecione...</option>
+                    <option value="TODAS">TODAS AS REGIONAIS</option>
+                    <option value="ALTO TIETE">ALTO TIETE</option>
+                    <option value="VALE DO PARAIBA">VALE DO PARAIBA</option>
+                    <option value="GRANDE SÃO PAULO">GRANDE SÃO PAULO</option>
+                    <option value="GRANDE CAMPINAS">GRANDE CAMPINAS</option>
+                </select>
+            </div>
+            <div class="flex gap-3 pt-4">
+                <button type="button" onclick="document.getElementById('modal-link').classList.add('hidden')" class="flex-1 px-4 py-2.5 border border-sa-gray rounded-lg text-xs font-bold text-sa-muted hover:bg-gray-50 transition-all">
+                    CANCELAR
+                </button>
+                <button type="submit" class="flex-1 bg-sa-wine text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-md hover:bg-sa-wine/90 transition-all">
+                    SALVAR LINK
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function copiarLink(url, btn) {
+    navigator.clipboard.writeText(url).then(() => {
+        const originalText = btn.querySelector('span').innerText;
+        const originalIcon = btn.querySelector('i').getAttribute('data-lucide');
+        
+        btn.querySelector('span').innerText = 'COPIADO!';
+        btn.classList.add('bg-emerald-500', 'text-white', 'border-emerald-500');
+        btn.querySelector('span').classList.add('text-white');
+        
+        setTimeout(() => {
+            btn.querySelector('span').innerText = originalText;
+            btn.classList.remove('bg-emerald-500', 'text-white', 'border-emerald-500');
+            btn.querySelector('span').classList.remove('text-white');
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}

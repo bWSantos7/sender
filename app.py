@@ -5,12 +5,28 @@ from datetime import datetime, timedelta
 import os
 import io
 import zipfile
+import json
 import pandas as pd
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
-from models import db, Corretor, Configuracao, EmailConfig, EnvioLog, FilaUpload, EmpreendimentoSupervisor
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role != 'admin':
+            flash('Acesso negado: Esta função é exclusiva para administradores.', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+from models import db, Corretor, Configuracao, EmailConfig, EnvioLog, FilaUpload, EmpreendimentoSupervisor, User, Anotacao, LinkForm
 from services.excel_parser import processar_planilha_base
 from services.pdf_generator import gerar_pdfs
 from services.email_sender import enviar_email_smtp, gerar_html_email
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def get_brasilia_time():
     return datetime.utcnow() - timedelta(hours=3)
@@ -21,17 +37,97 @@ app = Flask(__name__)
 stop_envio = threading.Event()
 thread_ativa = False
 
-app.secret_key = 'sousa_araujo_secreto'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.secret_key = os.getenv('SECRET_KEY', 'sousa_araujo_secreto_saas')
+# Suporte a PostgreSQL no Railway ou SQLite local
+database_url = os.getenv('DATABASE_URL', 'sqlite:///database.db')
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
+
+# Mapeamento de Regionais
+MAPA_REGIONAIS = {
+    "AMETISTA": "GRANDE CAMPINAS",
+    "CEREJEIRAS": "VALE DO PARAIBA",
+    "CEREJEIRAS II": "VALE DO PARAIBA",
+    "DUMONT": "VALE DO PARAIBA",
+    "FLORENÇA": "VALE DO PARAIBA",
+    "GRAN PORTINARI": "VALE DO PARAIBA",
+    "MONET": "GRANDE SÃO PAULO",
+    "MONET II": "GRANDE SÃO PAULO",
+    "PORTAL DO LAGO": "GRANDE CAMPINAS",
+    "RESIDENCIAL MONET": "GRANDE SÃO PAULO",
+    "RESIDENCIAL MONET II": "GRANDE SÃO PAULO",
+    "RESIDENCIAL TURMALINA": "GRANDE CAMPINAS",
+    "SAFIRA I": "GRANDE CAMPINAS",
+    "SAFIRA II": "GRANDE CAMPINAS",
+    "SOU MAIS DIADEMA": "GRANDE SÃO PAULO",
+    "SOU MAIS GUAIANASES": "GRANDE SÃO PAULO",
+    "SOU MAIS SUZANO": "ALTO TIETE",
+    "SOU MAIS URBAN": "GRANDE SÃO PAULO",
+    "SOU PLENO COTIA": "GRANDE SÃO PAULO",
+    "SOU PLENO HOME": "ALTO TIETE",
+    "SOU PLENO HOME II": "ALTO TIETE",
+    "SOU PLENO JACAREI": "VALE DO PARAIBA",
+    "SOU PLENO LIFE": "ALTO TIETE",
+    "SOU PLENO LIFE II": "ALTO TIETE",
+    "SOU PLENO PAISAGE": "GRANDE CAMPINAS",
+    "SOU PLENO PAISAGE - HORTOLANDIA": "GRANDE CAMPINAS",
+    "SOU PLENO PAISAGE II": "GRANDE CAMPINAS",
+    "SOU PLENO VISAGE - HORTOLANDIA": "GRANDE CAMPINAS",
+    "SOU SPECIAL MOMENT": "ALTO TIETE",
+    "SOU SPECIAL PLACE": "ALTO TIETE",
+    "SOU VIVER ALTOS DE SÃO JOSÉ": "VALE DO PARAIBA",
+    "SOU VIVER DIADEMA": "GRANDE SÃO PAULO",
+    "SOU VIVER DIADEMA II": "GRANDE SÃO PAULO",
+    "SOU VIVER ITATIBA I": "GRANDE CAMPINAS",
+    "SOU VIVER ITATIBA II": "GRANDE CAMPINAS",
+    "SOU VIVER JACAREI": "VALE DO PARAIBA",
+    "SOU VIVER JACAREI (DAVI LINO)": "VALE DO PARAIBA",
+    "SOU VIVER NOVA ODESSA": "GRANDE CAMPINAS",
+    "SOU VIVER POA": "ALTO TIETE",
+    "SOU VIVER RAVENNA": "VALE DO PARAIBA",
+    "SOU VIVER RAVENNA II": "VALE DO PARAIBA",
+    "SOU VIVER ROMA": "VALE DO PARAIBA",
+    "SOU VIVER SOROCABA": "GRANDE CAMPINAS",
+    "SOU VIVER TAUBATE": "VALE DO PARAIBA",
+    "SOU VIVER TAUBATE II": "VALE DO PARAIBA",
+    "SOU VIVER UP": "ALTO TIETE",
+    "SOU VIVER VERONA": "VALE DO PARAIBA",
+    "SOU VIVER VICENZA": "VALE DO PARAIBA",
+    "TANGARA II": "VALE DO PARAIBA",
+    "TANGARA III": "VALE DO PARAIBA",
+    "VIDALIA": "VALE DO PARAIBA",
+    "SOU VIVER MILÃO": "GRANDE SÃO PAULO"
+}
+
+def get_regional_by_emp(emp_name):
+    if not emp_name: return "OUTROS"
+    emp_upper = emp_name.upper().strip()
+    for key, regional in MAPA_REGIONAIS.items():
+        if key in emp_upper:
+            return regional
+    return "OUTROS"
+
+# Configuração do Login
+login_manager = LoginManager()
+login_manager.login_view = 'login'
+login_manager.login_message = 'Por favor, faça login para acessar esta página.'
+login_manager.login_message_category = 'warning'
+login_manager.init_app(app)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
 with app.app_context():
     db.create_all()
     # Inicializar configuração padrão se não existir
     if not Configuracao.query.first():
-        for tipo in ['Adiantamento', 'Repasse', 'Prêmio']:
+        for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'Premiação - Metas', 'House', 'Staff']:
             conf = Configuracao(
                 tipo=tipo,
                 link_form='https://forms.gle/exemplo',
@@ -42,8 +138,40 @@ with app.app_context():
             )
             db.session.add(conf)
         db.session.commit()
+    
+    # Criar usuário admin padrão se não existir
+    if not User.query.filter_by(username='admin').first():
+        hashed_pw = generate_password_hash('admin123')
+        admin = User(username='admin', password_hash=hashed_pw, is_admin=True)
+        db.session.add(admin)
+        db.session.commit()
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+        
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = User.query.filter_by(username=username).first()
+        
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
+            return redirect(url_for('index'))
+        else:
+            flash('Usuário ou senha inválidos.', 'error')
+            
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
 
 @app.route('/')
+@login_required
 def index():
     total_enviados = EnvioLog.query.filter_by(status='Sucesso').count()
     total_erros = EnvioLog.query.filter_by(status='Erro').count()
@@ -51,6 +179,8 @@ def index():
     return render_template('dashboard.html', total_enviados=total_enviados, total_erros=total_erros, logs=ultimos_logs)
 
 @app.route('/upload', methods=['GET', 'POST'])
+@login_required
+@admin_required
 def upload():
     if request.method == 'POST':
         tipo_envio = request.form.get('tipo_envio')
@@ -116,6 +246,12 @@ def upload():
                         if emp_sup.supervisor2 and '@' in emp_sup.supervisor2 and emp_sup.supervisor2 not in cc_emails_list:
                             cc_emails_list.append(emp_sup.supervisor2.strip())
                         
+            # Detectar Regional (Pega a regional do primeiro empreendimento da lista)
+            regional_item = "OUTROS"
+            if emps:
+                primeiro_emp = emps.split(',')[0].strip()
+                regional_item = get_regional_by_emp(primeiro_emp)
+
             cc_emails_str = ", ".join(cc_emails_list) if cc_emails_list else None
             
             novo_fila = FilaUpload(
@@ -124,7 +260,8 @@ def upload():
                 caminho_pdf=pdf_data['caminho'],
                 empreendimentos=emps,
                 destinatario_email=dest_email,
-                cc_emails=cc_emails_str
+                cc_emails=cc_emails_str,
+                regional=regional_item
             )
             db.session.add(novo_fila)
         
@@ -148,12 +285,18 @@ def upload():
     return render_template('upload.html')
 
 @app.route('/fila')
+@login_required
+@admin_required
 def fila():
-    itens_fila = FilaUpload.query.all()
+    query_fila = FilaUpload.query
+    if current_user.role != 'admin':
+        query_fila = query_fila.filter_by(regional=current_user.regional)
+    itens_fila = query_fila.all()
     # Identificar se o corretor existe no banco para vincular email
     fila_com_dados = []
     for item in itens_fila:
-        corretor = Corretor.query.filter_by(nome=item.corretor_nome).first()
+        # Busca robusta para exibir na fila
+        corretor = Corretor.query.filter(db.func.lower(Corretor.nome) == item.corretor_nome.lower().strip()).first()
         
         # Buscar última mensagem de erro se o status for Erro
         erro_msg = None
@@ -170,6 +313,8 @@ def fila():
     return render_template('fila.html', fila=fila_com_dados)
 
 @app.route('/importar_corretores', methods=['POST'])
+@login_required
+@admin_required
 def importar_corretores():
     file = request.files.get('file_corretores')
     if not file:
@@ -198,26 +343,24 @@ def importar_corretores():
     
     for _, row in df.iterrows():
         if pd.isna(row[colunas_map['NOME']]): continue
-        
         nome = str(row[colunas_map['NOME']]).strip()
         email = str(row[colunas_map['EMAIL']]).strip()
-        
-        if nome in processados:
-            continue
-            
         sup_col = colunas_map.get('SUPERVISOR')
         supervisor = str(row[sup_col]).strip() if sup_col and pd.notna(row[sup_col]) else 'sousaaraujo.contato@gmail.com'
         
+        reg_col = colunas_map.get('REGIONAL')
+        regional = str(row[reg_col]).strip().upper() if reg_col and pd.notna(row[reg_col]) else None
+        
         c = Corretor.query.filter_by(nome=nome).first()
         if not c:
-            c = Corretor(nome=nome, email=email, supervisor=supervisor)
+            c = Corretor(nome=nome, email=email, supervisor=supervisor, regional=regional)
             db.session.add(c)
             inseridos += 1
         else:
             c.email = email
             c.supervisor = supervisor
+            if regional: c.regional = regional
             atualizados += 1
-            
         processados.add(nome)
             
     db.session.commit()
@@ -225,6 +368,8 @@ def importar_corretores():
     return redirect(url_for('configuracoes'))
 
 @app.route('/importar_supervisores', methods=['POST'])
+@login_required
+@admin_required
 def importar_supervisores():
     file = request.files.get('file_supervisores')
     if not file:
@@ -232,7 +377,6 @@ def importar_supervisores():
         return redirect(url_for('configuracoes'))
     
     try:
-        # A aba se chamava tabel_supervisor
         df = pd.read_excel(file, sheet_name='tabel_supervisor', engine='openpyxl')
     except Exception:
         try:
@@ -240,6 +384,18 @@ def importar_supervisores():
         except Exception as e:
             flash(f'Erro ao ler arquivo: {str(e)}', 'error')
             return redirect(url_for('configuracoes'))
+
+    # Limpar tabela antes de importar novo arquivo
+    try:
+        query_del = EmpreendimentoSupervisor.query
+        if current_user.role != 'admin':
+            query_del = query_del.filter_by(regional=current_user.regional)
+        query_del.delete()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao limpar tabela base: {str(e)}', 'error')
+        return redirect(url_for('configuracoes'))
 
     colunas_map = {c.upper().strip(): c for c in df.columns}
     
@@ -249,27 +405,50 @@ def importar_supervisores():
         
     inseridos = 0
     atualizados = 0
-    
-    for _, row in df.iterrows():
-        emp = str(row[colunas_map['EMPREENDIMENTO']]).strip()
-        if pd.isna(row[colunas_map['EMPREENDIMENTO']]) or not emp or emp == 'nan': continue
-        
-        sup = str(row[colunas_map['SUPERVISOR']]).strip() if pd.notna(row[colunas_map['SUPERVISOR']]) else None
-        sup2_col = colunas_map.get('SUPERVISOR 2') or colunas_map.get('SUPERVISOR2')
-        sup2 = str(row[sup2_col]).strip() if sup2_col and pd.notna(row[sup2_col]) else None
-        
-        es = EmpreendimentoSupervisor.query.filter_by(empreendimento=emp).first()
-        if not es:
-            es = EmpreendimentoSupervisor(empreendimento=emp, supervisor=sup, supervisor2=sup2)
-            db.session.add(es)
-            inseridos += 1
-        else:
-            es.supervisor = sup
-            es.supervisor2 = sup2
-            atualizados += 1
+    processed_emps = {}
+
+    for i, row in df.iterrows():
+        try:
+            emp_raw = row[colunas_map['EMPREENDIMENTO']]
+            if pd.isna(emp_raw): continue
+            emp = str(emp_raw).strip()
+            if not emp or emp.lower() == 'nan': continue
+            
+            sup = str(row[colunas_map['SUPERVISOR']]).strip() if pd.notna(row[colunas_map['SUPERVISOR']]) else None
+            sup2_col = colunas_map.get('SUPERVISOR 2') or colunas_map.get('SUPERVISOR2')
+            sup2 = str(row[sup2_col]).strip() if sup2_col and pd.notna(row[sup2_col]) else None
+            
+            regional = get_regional_by_emp(emp)
+            
+            if emp in processed_emps:
+                es = processed_emps[emp]
+                es.supervisor = sup
+                es.supervisor2 = sup2
+                atualizados += 1
+            else:
+                es = EmpreendimentoSupervisor(empreendimento=emp, supervisor=sup, supervisor2=sup2, regional=regional)
+                db.session.add(es)
+                processed_emps[emp] = es
+                inseridos += 1
+        except Exception as e:
+            continue
             
     db.session.commit()
-    flash(f'Tabela de Empreendimentos lida! {inseridos} novos vinculados e {atualizados} atualizados.', 'success')
+    flash(f'Tabela de Empreendimentos atualizada! {inseridos} empreendimentos processados.', 'success')
+    return redirect(url_for('configuracoes'))
+
+@app.route('/zerar_supervisores', methods=['POST'])
+def zerar_supervisores():
+    try:
+        query_del = EmpreendimentoSupervisor.query
+        if current_user.role != 'admin':
+            query_del = query_del.filter_by(regional=current_user.regional)
+        query_del.delete()
+        db.session.commit()
+        flash('Tabela de supervisores zerada com sucesso.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Erro ao zerar tabela: {str(e)}', 'error')
     return redirect(url_for('configuracoes'))
 
 # Função rodando em thread separada
@@ -290,10 +469,11 @@ def processar_fila_background():
             item.status = 'Processando'
             db.session.commit()
             
-            corretor = Corretor.query.filter_by(nome=item.corretor_nome).first()
+            # Busca robusta (insensível a maiúsculas/minúsculas)
+            corretor = Corretor.query.filter(db.func.lower(Corretor.nome) == item.corretor_nome.lower().strip()).first()
             if not corretor:
                 item.status = 'Erro'
-                log = EnvioLog(corretor_id=1, tipo=item.tipo, status='Erro', mensagem_erro='Corretor não encontrado no banco', caminho_anexo=item.caminho_pdf)
+                log = EnvioLog(corretor_id=1, tipo=item.tipo, status='Erro', mensagem_erro='Corretor não encontrado no banco', caminho_anexo=item.caminho_pdf, regional=item.regional)
                 db.session.add(log)
                 db.session.commit()
                 continue
@@ -301,7 +481,7 @@ def processar_fila_background():
             # Pré-validações de disparo
             if not item.destinatario_email or '@' not in item.destinatario_email:
                 item.status = 'Erro'
-                log = EnvioLog(corretor_id=corretor.id, tipo=item.tipo, status='Erro', mensagem_erro='E-mail do destinatário ausente ou inválido', caminho_anexo=item.caminho_pdf)
+                log = EnvioLog(corretor_id=corretor.id, tipo=item.tipo, status='Erro', mensagem_erro='E-mail do destinatário ausente ou inválido', caminho_anexo=item.caminho_pdf, regional=item.regional)
                 db.session.add(log)
                 db.session.commit()
                 continue
@@ -319,23 +499,28 @@ def processar_fila_background():
                     'mes_referencia': config.mes_referencia
                 }
                 
+            log = EnvioLog(
+                corretor_id=corretor.id,
+                tipo=item.tipo,
+                status='Processando',
+                caminho_anexo=item.caminho_pdf,
+                regional=item.regional
+            )
+            db.session.add(log)
+            db.session.commit()
+
             sucesso, msg = enviar_email_smtp(
                 email_colaborador=item.destinatario_email,
                 nome_colaborador=item.corretor_nome,
                 supervisor=item.cc_emails,
                 supervisor2=None,
                 anexo_pdf=item.caminho_pdf,
-                config=config_dict
+                config=config_dict,
+                token=log.token
             )
             
-            log = EnvioLog(
-                corretor_id=corretor.id,
-                tipo=item.tipo,
-                status='Sucesso' if sucesso else 'Erro',
-                mensagem_erro=msg if not sucesso else None,
-                caminho_anexo=item.caminho_pdf
-            )
-            db.session.add(log)
+            log.status = 'Sucesso' if sucesso else 'Erro'
+            log.mensagem_erro = msg if not sucesso else None
             item.status = 'Concluido' if sucesso else 'Erro'
             db.session.commit()
             
@@ -345,26 +530,32 @@ def processar_fila_background():
 
 @app.route('/api/status_envio')
 def status_envio():
+    query_log = EnvioLog.query
+    query_fila = FilaUpload.query
+
     # Indicadores históricos (Dashboard)
-    total_sucesso = EnvioLog.query.filter_by(status='Sucesso').count()
-    total_erro = EnvioLog.query.filter_by(status='Erro').count()
+    total_sucesso = query_log.filter_by(status='Sucesso').count()
+    total_erro = query_log.filter_by(status='Erro').count()
     
     # Indicadores da fila atual
-    pendentes = FilaUpload.query.filter_by(status='Pendente').count()
-    processando = FilaUpload.query.filter_by(status='Processando').count()
-    concluidos = FilaUpload.query.filter_by(status='Concluido').count()
-    erros = FilaUpload.query.filter_by(status='Erro').count()
-    total = FilaUpload.query.count()
+    pendentes = query_fila.filter_by(status='Pendente').count()
+    processando = query_fila.filter_by(status='Processando').count()
+    concluidos = query_fila.filter_by(status='Concluido').count()
+    erros = query_fila.filter_by(status='Erro').count()
+    total = query_fila.count()
     
     # Logs recentes
     logs_data = []
-    for l in EnvioLog.query.order_by(EnvioLog.data_envio.desc()).limit(10).all():
+    for l in query_log.order_by(EnvioLog.data_envio.desc()).limit(10).all():
         logs_data.append({
             'corretor': l.corretor.nome if l.corretor else 'Desconhecido',
+            'email': l.destinatario_email or (l.corretor.email if l.corretor else ''),
+            'cc': l.cc_emails or '',
             'tipo': l.tipo,
             'data': l.data_envio.strftime('%d/%m/%Y %H:%M'),
             'status': l.status,
-            'erro': l.mensagem_erro or ''
+            'erro': l.mensagem_erro or '',
+            'caminho_anexo': l.caminho_anexo or ''
         })
     
     return jsonify({
@@ -383,18 +574,25 @@ def status_envio():
 @app.route('/limpar_logs', methods=['POST'])
 def limpar_logs():
     try:
-        EnvioLog.query.delete()
+        query_del = EnvioLog.query
+        if current_user.role != 'admin':
+            query_del = query_del.filter_by(regional=current_user.regional)
+        query_del.delete()
         db.session.commit()
         return jsonify({'sucesso': True})
     except Exception as e:
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 @app.route('/parar_envios', methods=['POST'])
+@login_required
+@admin_required
 def parar_envios():
     stop_envio.set()
     return jsonify({'sucesso': True, 'mensagem': 'Solicitação de parada enviada.'})
 
 @app.route('/iniciar_envios', methods=['POST'])
+@login_required
+@admin_required
 def iniciar_envios():
     global thread_ativa
     if thread_ativa:
@@ -410,9 +608,14 @@ def iniciar_envios():
     return redirect(url_for('fila'))
 
 @app.route('/limpar_fila', methods=['POST'])
+@login_required
+@admin_required
 def limpar_fila():
     try:
-        FilaUpload.query.delete()
+        query_del = FilaUpload.query
+        if current_user.role != 'admin':
+            query_del = query_del.filter_by(regional=current_user.regional)
+        query_del.delete()
         db.session.commit()
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
             return jsonify({'sucesso': True, 'mensagem': 'Fila limpa com sucesso!'})
@@ -424,6 +627,8 @@ def limpar_fila():
     return redirect(url_for('fila'))
 
 @app.route('/api/atualizar_email', methods=['POST'])
+@login_required
+@admin_required
 def atualizar_email():
     try:
         data = request.json
@@ -443,7 +648,7 @@ def atualizar_email():
         
         if not c:
             # Criar novo corretor
-            c = Corretor(nome=nome, email=email, supervisor='', supervisor2='')
+            c = Corretor(nome=nome, email=email, supervisor='', supervisor2='', regional=current_user.regional)
             db.session.add(c)
             criado_novo = True
         else:
@@ -468,8 +673,93 @@ def atualizar_email():
         db.session.rollback()
         return jsonify({'sucesso': False, 'erro': f'Erro interno: {str(e)}'}), 500
 
+@app.route('/api/enviar_unidade', methods=['POST'])
+def enviar_unidade():
+    try:
+        data = request.json
+        fila_id = data.get('id')
+        
+        item = FilaUpload.query.get(fila_id)
+        if not item:
+            return jsonify({'sucesso': False, 'erro': 'Item não encontrado na fila.'}), 404
+            
+        # Busca robusta do corretor
+        corretor = Corretor.query.filter(db.func.lower(Corretor.nome) == item.corretor_nome.lower().strip()).first()
+        if not corretor:
+            return jsonify({'sucesso': False, 'erro': 'Corretor não encontrado no banco de dados.'}), 404
+
+        if not item.destinatario_email or '@' not in item.destinatario_email:
+            return jsonify({'sucesso': False, 'erro': 'E-mail do destinatário ausente ou inválido.'}), 400
+
+        item.status = 'Processando'
+        db.session.commit()
+        
+        config = Configuracao.query.filter_by(tipo=item.tipo).first()
+        config_dict = {
+            'tipo': config.tipo if config else item.tipo,
+            'link_form': config.link_form if config else '',
+            'link_form_retroativo': config.link_form_retroativo if config else '',
+            'data_limite_envio': config.data_limite_envio if config else '',
+            'data_pagamento': config.data_pagamento if config else '',
+            'mes_referencia': config.mes_referencia if config else '',
+            'custom_message': config.custom_message if config else None,
+            'email_titulo': config.email_titulo if config else None,
+            'email_subtitulo': config.email_subtitulo if config else None,
+            'email_alerta_amarelo': config.email_alerta_amarelo if config else None,
+            'email_alerta_vermelho': config.email_alerta_vermelho if config else None,
+            'email_rodape': config.email_rodape if config else None,
+            'email_cnpjs': config.email_cnpjs if config else None,
+            'email_prazo': config.email_prazo if config else None,
+            'email_retroativo_titulo': config.email_retroativo_titulo if config else None,
+            'email_retroativo_texto': config.email_retroativo_texto if config else None
+        }
+
+        log = EnvioLog(
+            corretor_id=corretor.id,
+            tipo=item.tipo,
+            status='Processando',
+            caminho_anexo=item.caminho_pdf,
+            destinatario_email=item.destinatario_email,
+            cc_emails=item.cc_emails,
+            regional=item.regional
+        )
+        db.session.add(log)
+        db.session.commit()
+
+        sucesso, msg = enviar_email_smtp(
+            email_colaborador=item.destinatario_email,
+            nome_colaborador=item.corretor_nome,
+            supervisor=item.cc_emails,
+            supervisor2=None,
+            anexo_pdf=item.caminho_pdf,
+            config=config_dict,
+            token=log.token
+        )
+        
+        log.status = 'Sucesso' if sucesso else 'Erro'
+        log.mensagem_erro = msg if not sucesso else None
+        item.status = 'Concluido' if sucesso else 'Erro'
+        db.session.commit()
+        
+        return jsonify({'sucesso': sucesso, 'mensagem': msg})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'sucesso': False, 'erro': f'Erro interno: {str(e)}'}), 500
+
+@app.route('/corretores_lista')
+@login_required
+def corretores_lista():
+    corretores = Corretor.query.all()
+    supervisores = EmpreendimentoSupervisor.query.all()
+    return render_template('configuracoes_view.html', corretores=corretores, supervisores=supervisores)
+
 @app.route('/configuracoes', methods=['GET', 'POST'])
+@login_required
 def configuracoes():
+    if current_user.role != 'admin':
+        return redirect(url_for('corretores_lista'))
+
+    # Admin tem acesso total
     email_conf = EmailConfig.query.first()
     if not email_conf:
         email_conf = EmailConfig()
@@ -477,42 +767,57 @@ def configuracoes():
         db.session.commit()
 
     # Garantir que todos os tipos de configuração existem
-    for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'House', 'Staff']:
+    for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'Premiação - Metas', 'House', 'Staff']:
         if not Configuracao.query.filter_by(tipo=tipo).first():
             db.session.add(Configuracao(tipo=tipo))
     db.session.commit()
 
     if request.method == 'POST':
-        # Atualizar Links e Datas
-        for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'House', 'Staff']:
+        section_type = request.form.get('section_type')
+        
+        if section_type == 'smtp':
+            # Atualizar Config de Email
+            if request.form.get('smtp_user'):
+                email_conf.smtp_server = request.form.get('smtp_server')
+                email_conf.smtp_port = int(request.form.get('smtp_port') or 587)
+                email_conf.smtp_user = request.form.get('smtp_user')
+                if request.form.get('smtp_pass'):
+                    email_conf.smtp_pass = request.form.get('smtp_pass')
+                email_conf.from_name = request.form.get('from_name')
+                db.session.commit()
+                flash('Servidor de e-mail atualizado com sucesso.', 'success')
+        
+        elif section_type == 'config_tipo':
+            tipo = request.form.get('tipo_alvo')
             conf = Configuracao.query.filter_by(tipo=tipo).first()
-            if not conf:
-                conf = Configuracao(tipo=tipo)
-                db.session.add(conf)
-            
-            conf.link_form = request.form.get(f'{tipo}_link_form')
-            conf.link_form_retroativo = request.form.get(f'{tipo}_link_form_retroativo')
-            conf.data_limite_envio = request.form.get(f'{tipo}_data_limite_envio')
-            conf.data_pagamento = request.form.get(f'{tipo}_data_pagamento')
-            conf.mes_referencia = request.form.get(f'{tipo}_mes_referencia')
-            conf.custom_message = request.form.get(f'{tipo}_custom_message')
-            conf.email_titulo = request.form.get(f'{tipo}_email_titulo')
-            conf.email_subtitulo = request.form.get(f'{tipo}_email_subtitulo')
-            conf.email_alerta_amarelo = request.form.get(f'{tipo}_email_alerta_amarelo')
-            conf.email_alerta_vermelho = request.form.get(f'{tipo}_email_alerta_vermelho')
-            conf.email_rodape = request.form.get(f'{tipo}_email_rodape')
-            
-        # Atualizar Config de Email
-        if request.form.get('smtp_user'):
-            email_conf.smtp_server = request.form.get('smtp_server')
-            email_conf.smtp_port = int(request.form.get('smtp_port') or 587)
-            email_conf.smtp_user = request.form.get('smtp_user')
-            if request.form.get('smtp_pass'):
-                email_conf.smtp_pass = request.form.get('smtp_pass')
-            email_conf.from_name = request.form.get('from_name')
+            if conf:
+                old_date = conf.data_limite_envio
+                old_pgto = conf.data_pagamento
+                old_mes = conf.mes_referencia
+                
+                new_date = request.form.get("data_limite_envio")
+                new_pgto = request.form.get("data_pagamento")
+                new_mes = request.form.get("mes_referencia")
 
-        db.session.commit()
-        flash('Configurações salvas com sucesso.', 'success')
+                conf.link_form = request.form.get("link_form")
+                conf.link_form_retroativo = request.form.get("link_form_retroativo")
+                conf.data_limite_envio = new_date
+                conf.data_pagamento = new_pgto
+                conf.mes_referencia = new_mes
+
+                # Sincronizar com o HTML customizado se ele existir
+                if conf.email_prazo and old_date and old_date != new_date:
+                    conf.email_prazo = conf.email_prazo.replace(old_date, new_date)
+                
+                if conf.email_rodape and old_pgto and old_pgto != new_pgto:
+                    conf.email_rodape = conf.email_rodape.replace(old_pgto, new_pgto)
+
+                if conf.email_titulo and old_mes and old_mes != new_mes:
+                    conf.email_titulo = conf.email_titulo.replace(old_mes, new_mes)
+
+                db.session.commit()
+                flash(f'Configurações de {tipo} salvas com sucesso.', 'success')
+
         return redirect(url_for('configuracoes'))
         
     configs = Configuracao.query.all()
@@ -532,6 +837,7 @@ def configuracoes():
                          email_conf=email_conf)
 
 @app.route('/colaboradores')
+@login_required
 def colaboradores():
     corretores = Corretor.query.all()
     empreendimentos = EmpreendimentoSupervisor.query.all()
@@ -629,16 +935,23 @@ def editar_corretor():
         if not corretor:
             return jsonify({'sucesso': False, 'erro': 'Corretor não encontrado.'}), 404
     else:
-        # Criar novo se não houver ID
         corretor = Corretor()
         db.session.add(corretor)
         
     corretor.nome = data.get('nome')
     corretor.email = data.get('email')
+    corretor.supervisor = data.get('supervisor')
+
+    if not corretor.regional:
+        corretor.regional = data.get('regional') or current_user.regional
     
+    # Se não for admin, força a regional do usuário
+    if current_user.role != 'admin':
+        corretor.regional = current_user.regional
+
     try:
         db.session.commit()
-        return jsonify({'sucesso': True})
+        return jsonify({'sucesso': True, 'id': corretor.id})
     except Exception as e:
         db.session.rollback()
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
@@ -661,9 +974,16 @@ def editar_empreendimento():
     emp.supervisor = data.get('supervisor')
     emp.supervisor2 = data.get('supervisor2')
     
+    if not emp.regional:
+        emp.regional = data.get('regional') or current_user.regional
+        
+    # Se não for admin, força a regional do usuário
+    if current_user.role != 'admin':
+        emp.regional = current_user.regional
+    
     try:
         db.session.commit()
-        return jsonify({'sucesso': True})
+        return jsonify({'sucesso': True, 'id': emp.id})
     except Exception as e:
         db.session.rollback()
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
@@ -695,7 +1015,111 @@ def salvar_template():
         db.session.rollback()
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
+@app.route('/v/<token>')
+def view_email(token):
+    log = EnvioLog.query.filter_by(token=token).first()
+    if not log:
+        return "Mensagem não encontrada.", 404
+        
+    corretor_nome = log.corretor.nome if log.corretor else "Colaborador"
+    config = Configuracao.query.filter_by(tipo=log.tipo).first()
+    
+    # Simular config dict para o gerador
+    config_dict = {
+        'tipo': log.tipo,
+        'link_form': config.link_form if config else '#',
+        'link_form_retroativo': config.link_form_retroativo if config else '#',
+        'data_limite_envio': config.data_limite_envio if config else '',
+        'data_pagamento': config.data_pagamento if config else '',
+        'mes_referencia': config.mes_referencia if config else '',
+        'custom_message': config.custom_message if config else None,
+        'email_titulo': config.email_titulo if config else None,
+        'email_subtitulo': config.email_subtitulo if config else None,
+        'email_alerta_amarelo': config.email_alerta_amarelo if config else None,
+        'email_alerta_vermelho': config.email_alerta_vermelho if config else None,
+        'email_rodape': config.email_rodape if config else None,
+        'email_cnpjs': config.email_cnpjs if config else None,
+        'email_prazo': config.email_prazo if config else None,
+        'email_retroativo_titulo': config.email_retroativo_titulo if config else None,
+        'email_retroativo_texto': config.email_retroativo_texto if config else None
+    }
+    
+    email_html = gerar_html_email(corretor_nome, log.tipo, config_dict)
+    return email_html
+
+@app.route('/anotacoes')
+@login_required
+def anotacoes():
+    # Removido filtro de regional para que todos vejam as planilhas gerais
+    lista_db = Anotacao.query.order_by(Anotacao.data_criacao.desc()).all()
+    anotacoes = []
+    for a in lista_db:
+        try:
+            cols = json.loads(a.colunas) if a.colunas else []
+            rows = json.loads(a.dados) if a.dados else []
+            layout = json.loads(a.layout) if a.layout else {}
+        except:
+            cols = []
+            rows = []
+            layout = {}
+            
+        anotacoes.append({
+            'id': a.id,
+            'titulo': a.titulo,
+            'colunas': cols,
+            'dados': rows,
+            'layout': layout
+        })
+    return render_template('anotacoes.html', anotacoes=anotacoes)
+
+@app.route('/api/anotacoes', methods=['POST'])
+@login_required
+@admin_required
+def salvar_anotacao():
+    data = request.json
+    id_planilha = data.get('id')
+    
+    titulo = data.get('titulo', 'Nova Planilha')
+    colunas = json.dumps(data.get('colunas', []))
+    dados = json.dumps(data.get('dados', []))
+    layout = json.dumps(data.get('layout', {}))
+    
+    try:
+        if id_planilha:
+            a = Anotacao.query.get(id_planilha)
+            if a:
+                a.titulo = titulo
+                a.colunas = colunas
+                a.dados = dados
+                a.layout = layout
+        else:
+            a = Anotacao(titulo=titulo, colunas=colunas, dados=dados, layout=layout)
+            db.session.add(a)
+        db.session.commit()
+        return jsonify({'sucesso': True, 'id': a.id})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+@app.route('/api/anotacoes/<int:id>', methods=['DELETE'])
+@login_required
+@admin_required
+def excluir_anotacao(id):
+    anotacao = Anotacao.query.get(id)
+    if not anotacao:
+        return jsonify({'sucesso': False, 'erro': 'Anotação não encontrada.'}), 404
+        
+    try:
+        db.session.delete(anotacao)
+        db.session.commit()
+        return jsonify({'sucesso': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
 @app.route('/preview_email')
+@login_required
+@admin_required
 def preview_email():
     tipo = request.args.get('tipo', 'Adiantamento')
     conf = Configuracao.query.filter_by(tipo=tipo).first()
@@ -721,6 +1145,92 @@ def preview_email():
     
     email_html = gerar_html_email("Nome do Corretor Teste", tipo, config_dict)
     return render_template('preview_editor.html', email_html=email_html, tipo=tipo)
+
+# --- GESTÃO DE USUÁRIOS (ADMIN) ---
+@app.route('/usuarios')
+@login_required
+@admin_required
+def listar_usuarios():
+    if current_user.role != 'admin':
+        flash('Acesso negado.', 'error')
+        return redirect(url_for('index'))
+    usuarios = User.query.all()
+    return render_template('usuarios.html', usuarios=usuarios)
+
+@app.route('/usuarios/novo', methods=['POST'])
+@login_required
+@admin_required
+def novo_usuario():
+    if current_user.role != 'admin': return jsonify({'sucesso': False, 'erro': 'Negado'})
+    data = request.form
+    username = data.get('username')
+    password = data.get('password')
+    role = data.get('role', 'user')
+    regional = data.get('regional')
+    
+    if User.query.filter_by(username=username).first():
+        flash('Usuário já existe.', 'error')
+        return redirect(url_for('listar_usuarios'))
+        
+    hashed_pw = generate_password_hash(password)
+    user = User(username=username, password_hash=hashed_pw, role=role, regional=regional, is_admin=(role=='admin'))
+    db.session.add(user)
+    db.session.commit()
+    flash('Usuário criado!', 'success')
+    return redirect(url_for('listar_usuarios'))
+
+@app.route('/usuarios/excluir/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def excluir_usuario(id):
+    if current_user.role != 'admin': return jsonify({'sucesso': False})
+    if id == current_user.id:
+        flash('Você não pode excluir a si mesmo.', 'error')
+        return redirect(url_for('listar_usuarios'))
+    user = User.query.get(id)
+    if user:
+        db.session.delete(user)
+        db.session.commit()
+        flash('Usuário excluído.', 'success')
+    return redirect(url_for('listar_usuarios'))
+
+# --- GESTÃO DE LINKS ---
+@app.route('/links')
+@login_required
+def listar_links():
+    links = LinkForm.query.all()
+    return render_template('links.html', links=links)
+
+@app.route('/links/novo', methods=['POST'])
+@login_required
+@admin_required
+def novo_link():
+    if current_user.role != 'admin': return jsonify({'sucesso': False})
+    data = request.form
+    link = LinkForm(
+        nome=data.get('nome'),
+        link=data.get('link'),
+        prazo_abertura=data.get('prazo_abertura'),
+        prazo_encerramento=data.get('prazo_encerramento'),
+        status=data.get('status', 'Ativo'),
+        regional=data.get('regional')
+    )
+    db.session.add(link)
+    db.session.commit()
+    flash('Link criado!', 'success')
+    return redirect(url_for('listar_links'))
+
+@app.route('/links/excluir/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def excluir_link(id):
+    if current_user.role != 'admin': return jsonify({'sucesso': False})
+    link = LinkForm.query.get(id)
+    if link:
+        db.session.delete(link)
+        db.session.commit()
+        flash('Link excluído.', 'success')
+    return redirect(url_for('listar_links'))
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

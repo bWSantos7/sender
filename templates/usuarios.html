@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Gestão de Usuários{% endblock %}
+{% block header_title %}GERENCIAMENTO DE USUÁRIOS{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-xl shadow-sm border border-sa-gray overflow-hidden">
+    <div class="p-6 border-b border-sa-gray flex justify-between items-center bg-gray-50/50">
+        <div>
+            <h2 class="text-lg font-bold text-sa-wine">Usuários do Sistema</h2>
+            <p class="text-xs text-sa-muted mt-1">Gerencie acessos, perfis e regionais.</p>
+        </div>
+        <button onclick="document.getElementById('modal-usuario').classList.remove('hidden')" class="bg-sa-wine text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-sa-wine/90 flex items-center gap-2 transition-all">
+            <i data-lucide="user-plus" class="w-4 h-4"></i> NOVO USUÁRIO
+        </button>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-gray-50 text-[10px] uppercase tracking-widest text-sa-muted font-bold">
+                    <th class="px-6 py-4 border-b border-sa-gray">Usuário</th>
+                    <th class="px-6 py-4 border-b border-sa-gray">Perfil</th>
+                    <th class="px-6 py-4 border-b border-sa-gray">Regional</th>
+                    <th class="px-6 py-4 border-b border-sa-gray text-right">Ações</th>
+                </tr>
+            </thead>
+            <tbody class="text-sm divide-y divide-sa-gray">
+                {% for u in usuarios %}
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-6 py-4 font-semibold text-sa-text">{{ u.username }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 rounded text-[10px] font-black {% if u.role == 'admin' %} bg-sa-wine/10 text-sa-wine border border-sa-wine/20 {% else %} bg-slate-100 text-slate-600 border border-slate-200 {% endif %}">
+                            {{ u.role|upper }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if u.regional %}
+                        <span class="text-xs font-bold text-slate-700">{{ u.regional }}</span>
+                        {% else %}
+                        <span class="text-xs text-sa-muted italic">Acesso Total (Geral)</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        {% if u.id != current_user.id %}
+                        <form action="{{ url_for('excluir_usuario', id=u.id) }}" method="POST" onsubmit="return confirm('Excluir este usuário permanentemente?')">
+                            <button type="submit" class="text-red-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-all">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal Novo Usuário -->
+<div id="modal-usuario" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div class="p-6 border-b border-sa-gray bg-sa-wine text-white">
+            <h3 class="text-lg font-bold">Cadastrar Novo Usuário</h3>
+            <p class="text-xs opacity-80">Preencha os dados de acesso e regional.</p>
+        </div>
+        <form action="{{ url_for('novo_usuario') }}" method="POST" class="p-6 space-y-4">
+            <div>
+                <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Nome de Usuário</label>
+                <input type="text" name="username" required class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine focus:ring-2 focus:ring-sa-wine/20 transition-all">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Senha Inicial</label>
+                <input type="password" name="password" required class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine focus:ring-2 focus:ring-sa-wine/20 transition-all">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Perfil</label>
+                    <select name="role" class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+                        <option value="user">Usuário</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Regional</label>
+                    <select name="regional" required class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+                        <option value="" disabled selected>Selecione...</option>
+                        <option value="ALTO TIETE">ALTO TIETE</option>
+                        <option value="VALE DO PARAIBA">VALE DO PARAIBA</option>
+                        <option value="GRANDE SÃO PAULO">GRANDE SÃO PAULO</option>
+                        <option value="GRANDE CAMPINAS">GRANDE CAMPINAS</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-3 pt-4">
+                <button type="button" onclick="document.getElementById('modal-usuario').classList.add('hidden')" class="flex-1 px-4 py-2.5 border border-sa-gray rounded-lg text-xs font-bold text-sa-muted hover:bg-gray-50 transition-all">
+                    CANCELAR
+                </button>
+                <button type="submit" class="flex-1 bg-sa-wine text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-md hover:bg-sa-wine/90 transition-all">
+                    CRIAR USUÁRIO
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

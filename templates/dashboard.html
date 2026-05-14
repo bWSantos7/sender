@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Cabeçalho de Indicadores (Apenas Admin) -->
+{% if current_user.role == 'admin' %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
     <div class="bg-white border border-sa-gray p-6 rounded-lg shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <span class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Sucessos</span>
@@ -26,42 +28,60 @@
 
     <div class="bg-white border border-sa-gray p-6 rounded-lg shadow-sm flex flex-col justify-between">
         <div class="flex items-center justify-between">
-            <span class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Histórico</span>
+            <span class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Ações Rápidas</span>
             <button onclick="limparHistorico()" class="text-[10px] font-bold text-sa-red hover:underline">LIMPAR LOGS</button>
         </div>
         <div class="mt-4 flex items-center gap-2">
-            <div class="w-full h-1.5 bg-sa-gray rounded-full overflow-hidden">
-                <div class="h-full bg-sa-wine w-2/3"></div>
-            </div>
+            <p class="text-[10px] text-sa-muted">Limpeza de registros históricos para otimização.</p>
         </div>
     </div>
 </div>
+{% endif %}
 
 <div class="bg-white border border-sa-gray rounded-lg shadow-sm overflow-hidden">
     <div class="px-6 py-4 border-b border-sa-gray bg-slate-50 flex justify-between items-center">
-        <h3 class="text-xs font-bold text-sa-text uppercase tracking-widest">Atividade Recente</h3>
+        <h3 class="text-xs font-bold text-sa-text uppercase tracking-widest">Relatório de Envios</h3>
+        
+        <!-- Barra de Busca -->
+        <div class="relative w-64">
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-sa-muted"></i>
+            <input type="text" id="input-busca" placeholder="Buscar corretor ou tipo..." onkeyup="filtrarTabela()" 
+                   class="w-full pl-9 pr-4 py-1.5 text-xs bg-white border border-sa-gray rounded-lg focus:ring-1 focus:ring-sa-wine outline-none transition-all">
+        </div>
     </div>
     <div class="overflow-x-auto">
-        <table class="w-full text-left text-xs">
+        <table class="w-full text-left text-[10px]" id="tabela-logs">
             <thead class="bg-slate-50 text-sa-muted font-bold uppercase tracking-wider">
                 <tr>
-                    <th class="px-6 py-3 border-b border-sa-gray">Corretor</th>
-                    <th class="px-6 py-3 border-b border-sa-gray">Tipo</th>
-                    <th class="px-6 py-3 border-b border-sa-gray">Data</th>
-                    <th class="px-6 py-3 border-b border-sa-gray text-right">Status</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">CORRETOR</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">E-MAIL</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">TIPO</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">CÓPIAS (CC)</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">STATUS</th>
+                    <th class="px-6 py-3 border-b border-sa-gray text-right">AÇÕES</th>
                 </tr>
             </thead>
             <tbody id="logs-tbody" class="divide-y divide-sa-gray">
                 {% for log in logs %}
-                <tr class="hover:bg-slate-50 transition-colors">
-                    <td class="px-6 py-4 font-semibold text-sa-text">{{ log.corretor.nome if log.corretor else 'Desconhecido' }}</td>
-                    <td class="px-6 py-4 text-sa-muted">{{ log.tipo }}</td>
-                    <td class="px-6 py-4 text-sa-muted">{{ log.data_envio.strftime('%d/%m/%Y %H:%M') }}</td>
-                    <td class="px-6 py-4 text-right">
+                <tr class="hover:bg-slate-50 transition-colors log-row">
+                    <td class="px-6 py-4 font-bold text-sa-text col-corretor">{{ log.corretor.nome if log.corretor else 'Desconhecido' }}</td>
+                    <td class="px-6 py-4 text-sa-muted col-email">{{ log.destinatario_email or (log.corretor.email if log.corretor else '-') }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-0.5 rounded bg-gray-100 text-sa-muted text-[9px] font-bold uppercase col-tipo">{{ log.tipo }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-sa-muted max-w-[160px] truncate col-cc" title="{{ log.cc_emails or '' }}">{{ log.cc_emails or '-' }}</td>
+                    <td class="px-6 py-4">
                         {% if log.status == 'Sucesso' %}
-                        <span class="px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">SUCESSO</span>
+                        <span class="text-emerald-600 font-bold uppercase">CONCLUÍDO</span>
                         {% else %}
-                        <span class="px-2 py-1 rounded bg-red-50 text-sa-red text-[10px] font-bold" title="{{ log.mensagem_erro }}">ERRO</span>
+                        <span class="text-sa-red font-bold uppercase" title="{{ log.mensagem_erro }}">ERRO</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                        {% if log.caminho_anexo %}
+                        <button onclick="abrirPDF('{{ log.caminho_anexo.replace('\\', '/') }}')" class="text-sa-muted hover:text-sa-wine transition-all" title="Ver PDF">
+                            <i data-lucide="file-text" class="w-4 h-4"></i>
+                        </button>
                         {% endif %}
                     </td>
                 </tr>
@@ -72,31 +92,80 @@
 </div>
 
 <script>
-function updateDashboard() {
-    fetch('/api/status_envio').then(r => r.json()).then(data => {
-        document.getElementById('total-sucesso').innerText = data.concluidos;
-        document.getElementById('total-erro').innerText = data.erros;
-        const tbody = document.getElementById('logs-tbody');
-        if (data.logs && data.logs.length > 0) {
-            let html = '';
-            data.logs.forEach(log => {
-                const badge = log.status === 'Sucesso' 
-                    ? `<span class="px-2 py-1 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">SUCESSO</span>`
-                    : `<span class="px-2 py-1 rounded bg-red-50 text-sa-red text-[10px] font-bold" title="${log.erro}">ERRO</span>`;
-                html += `<tr class="hover:bg-slate-50 transition-colors">
-                    <td class="px-6 py-4 font-semibold text-sa-text">${log.corretor}</td>
-                    <td class="px-6 py-4 text-sa-muted">${log.tipo}</td>
-                    <td class="px-6 py-4 text-sa-muted">${log.data}</td>
-                    <td class="px-6 py-4 text-right">${badge}</td>
-                </tr>`;
-            });
-            tbody.innerHTML = html;
+function filtrarTabela() {
+    const input = document.getElementById('input-busca');
+    const filter = input.value.toLowerCase();
+    const rows = document.querySelectorAll('.log-row');
+
+    rows.forEach(row => {
+        const corretor = row.querySelector('.col-corretor').innerText.toLowerCase();
+        const email = row.querySelector('.col-email').innerText.toLowerCase();
+        const tipo = row.querySelector('.col-tipo').innerText.toLowerCase();
+        const cc = row.querySelector('.col-cc').innerText.toLowerCase();
+        if (corretor.includes(filter) || email.includes(filter) || tipo.includes(filter) || cc.includes(filter)) {
+            row.style.display = "";
+        } else {
+            row.style.display = "none";
         }
     });
 }
+
+function abrirPDF(caminhoFull) {
+    let parts = caminhoFull.split(/[\\/]/);
+    let uploadsIdx = parts.indexOf('uploads');
+    if (uploadsIdx !== -1) {
+        let relPath = parts.slice(uploadsIdx + 1).join('/');
+        window.open(`/api/visualizar_arquivo/${relPath}`, '_blank');
+    } else {
+        alert('Caminho do arquivo inválido.');
+    }
+}
+
+function updateDashboard() {
+    fetch('/api/status_envio').then(r => r.json()).then(data => {
+        const tSucesso = document.getElementById('total-sucesso');
+        const tErro = document.getElementById('total-erro');
+        if(tSucesso) tSucesso.innerText = data.concluidos;
+        if(tErro) tErro.innerText = data.erros;
+        
+        const tbody = document.getElementById('logs-tbody');
+        if (data.logs && data.logs.length > 0) {
+            if (document.getElementById('input-busca').value !== '') return;
+
+            let html = '';
+            data.logs.forEach(log => {
+                const statusHtml = log.status === 'Sucesso' 
+                    ? `<span class="text-emerald-600 font-bold uppercase">CONCLUÍDO</span>`
+                    : `<span class="text-sa-red font-bold uppercase" title="${log.erro}">ERRO</span>`;
+                
+                const pdfBtn = log.caminho_anexo 
+                    ? `<button onclick="abrirPDF('${log.caminho_anexo.replace(/\\/g, '/')}')" class="text-sa-muted hover:text-sa-wine transition-all" title="Ver PDF">
+                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                       </button>`
+                    : '';
+
+                html += `<tr class="hover:bg-slate-50 transition-colors log-row">
+                    <td class="px-6 py-4 font-bold text-sa-text col-corretor">${log.corretor}</td>
+                    <td class="px-6 py-4 text-sa-muted col-email">${log.email || '-'}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-0.5 rounded bg-gray-100 text-sa-muted text-[9px] font-bold uppercase col-tipo">${log.tipo}</span>
+                    </td>
+                    <td class="px-6 py-4 text-sa-muted max-w-[160px] truncate col-cc" title="${log.cc || ''}">${log.cc || '-'}</td>
+                    <td class="px-6 py-4">${statusHtml}</td>
+                    <td class="px-6 py-4 text-right">
+                        ${pdfBtn}
+                    </td>
+                </tr>`;
+            });
+            tbody.innerHTML = html;
+            lucide.createIcons();
+        }
+    });
+}
+
 function limparHistorico() {
     if (confirm('Limpar logs?')) fetch('/limpar_logs', {method:'POST'}).then(() => window.location.reload());
 }
-setInterval(updateDashboard, 5000);
+setInterval(updateDashboard, 10000); // Aumentado para 10s para poupar recursos
 </script>
 {% endblock %}

@@ -1,138 +1,225 @@
 {% extends "base.html" %}
 
-{% block header_title %}Configurações do Sistema{% endblock %}
+{% block title %}Configurações do Sistema{% endblock %}
 
 {% block content %}
-<form action="{{ url_for('configuracoes') }}" method="post" class="space-y-8">
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- SMTP -->
-        <div class="bg-white border border-sa-gray rounded-lg shadow-sm p-8 h-fit relative">
-            <div class="flex justify-between items-start mb-8 border-b border-sa-gray pb-4">
-                <div>
-                    <h3 class="text-sm font-bold text-sa-text uppercase tracking-widest">Servidor de E-mail</h3>
-                    <p class="text-[11px] text-sa-muted mt-1">Configure o SMTP para disparos automáticos.</p>
-                </div>
-                <button type="button" onclick="toggleEdit('smtp-section')" class="p-2 text-sa-muted hover:text-sa-wine transition-all rounded-full hover:bg-slate-50 border border-transparent hover:border-sa-gray">
-                    <i data-lucide="pencil" class="w-4 h-4"></i>
-                </button>
-            </div>
+<div class="mb-8">
+    <h1 class="text-3xl font-bold text-sa-wine tracking-tight">Configurações</h1>
+    <p class="text-sa-muted mt-1">Gerencie os parâmetros globais e templates de e-mail.</p>
+</div>
 
-            <div id="smtp-section" class="space-y-5 pointer-events-none opacity-80 transition-all">
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-1.5">
-                        <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Remetente</label>
-                        <input type="text" name="from_name" value="{{ email_conf.from_name if email_conf else '' }}" class="w-full px-4 py-2.5 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all" readonly>
-                    </div>
-                    <div class="space-y-1.5">
-                        <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">E-mail</label>
-                        <input type="email" name="smtp_user" value="{{ email_conf.smtp_user if email_conf else '' }}" class="w-full px-4 py-2.5 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all" readonly>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-1.5">
-                        <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Servidor Host</label>
-                        <input type="text" name="smtp_server" value="{{ email_conf.smtp_server if email_conf else 'smtp.gmail.com' }}" class="w-full px-4 py-2.5 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all" readonly>
-                    </div>
-                    <div class="space-y-1.5">
-                        <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Porta</label>
-                        <input type="number" name="smtp_port" value="{{ email_conf.smtp_port if email_conf else 587 }}" class="w-full px-4 py-2.5 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all" readonly>
-                    </div>
-                </div>
-                <div class="space-y-1.5">
-                    <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Senha de Aplicativo</label>
-                    <input type="password" name="smtp_pass" placeholder="••••••••••••••••" class="w-full px-4 py-2.5 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all" readonly>
-                </div>
-            </div>
-        </div>
-
-        <!-- Parâmetros das Comissões -->
-        <div class="bg-white border border-sa-gray rounded-lg shadow-sm p-8 relative">
-            <div class="flex justify-between items-start mb-8 border-b border-sa-gray pb-4">
-                <div>
-                    <h3 class="text-sm font-bold text-sa-text uppercase tracking-widest">Parâmetros das Comissões</h3>
-                    <p class="text-[11px] text-sa-muted mt-1">Links e datas para geração dos PDFs.</p>
-                </div>
-                <button type="button" onclick="toggleEdit('params-section')" class="p-2 text-sa-muted hover:text-sa-wine transition-all rounded-full hover:bg-slate-50 border border-transparent hover:border-sa-gray">
-                    <i data-lucide="pencil" class="w-4 h-4"></i>
-                </button>
-            </div>
-
-            <div id="params-section" class="space-y-8 pointer-events-none opacity-80 transition-all">
-                {% for conf in configs %}
-                <div class="space-y-4 pb-6 border-b border-slate-100 last:border-0 last:pb-0">
-                    <div class="flex justify-between items-center">
-                        <h4 class="text-xs font-bold text-sa-wine uppercase tracking-widest">{{ conf.tipo }}</h4>
-                        <a href="/preview_email?tipo={{ conf.tipo }}" target="_blank" class="text-[10px] font-bold text-sa-muted hover:text-sa-wine transition-colors uppercase tracking-widest flex items-center gap-1">
-                            <i data-lucide="eye" class="w-3 h-3"></i> Preview
-                        </a>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="space-y-1.5 col-span-2">
-                            <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Link do Formulário</label>
-                            <input type="text" name="{{ conf.tipo }}_link_form" value="{{ conf.link_form or '' }}" class="w-full px-4 py-2 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
-                        </div>
-                        <div class="space-y-1.5 col-span-2">
-                            <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Link do Formulário Retroativo</label>
-                            <input type="text" name="{{ conf.tipo }}_link_form_retroativo" value="{{ conf.link_form_retroativo or '' }}" class="w-full px-4 py-2 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
-                        </div>
-                        <div class="space-y-1.5">
-                            <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Mês Referência</label>
-                            <input type="text" name="{{ conf.tipo }}_mes_referencia" value="{{ conf.mes_referencia or '' }}" placeholder="Ex: Janeiro/2026" class="w-full px-4 py-2 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
-                        </div>
-                        <div class="space-y-1.5">
-                            <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Data Limite</label>
-                            <input type="text" name="{{ conf.tipo }}_data_limite_envio" value="{{ conf.data_limite_envio or '' }}" class="w-full px-4 py-2 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
-                        </div>
-                        <div class="space-y-1.5 col-span-2">
-                            <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Data Pagamento</label>
-                            <input type="text" name="{{ conf.tipo }}_data_pagamento" value="{{ conf.data_pagamento or '' }}" class="w-full px-4 py-2 bg-slate-50 border border-sa-gray rounded text-xs focus:border-sa-wine transition-all">
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Actions & Admin -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-end">
-        <div class="bg-white border border-sa-gray rounded-lg shadow-sm p-8">
-            <h4 class="text-xs font-bold text-sa-text uppercase tracking-widest mb-4">Administrativo</h4>
-            <a href="/download_db" class="w-full flex items-center justify-center gap-2 py-3 border border-sa-gray rounded text-[10px] font-bold text-sa-muted hover:bg-slate-50 transition-all uppercase tracking-widest">
-                <i data-lucide="database" class="w-3 h-3"></i>
-                Backup Banco de Dados
-            </a>
-        </div>
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
+    
+    <!-- Coluna da Esquerda: Configurações Gerais -->
+    <div class="xl:col-span-1 space-y-8">
         
-        <div>
-            <button type="submit" class="w-full h-14 bg-sa-dark text-white font-bold rounded hover:bg-sa-wine transition-all shadow-lg text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                <i data-lucide="save" class="w-4 h-4"></i>
-                Salvar Todas as Configurações
-            </button>
+        <!-- SMTP Config -->
+        <section id="card-smtp" class="bg-white rounded-2xl shadow-sm border border-sa-gray overflow-hidden config-card transition-all">
+            <div class="p-6 border-b border-sa-gray bg-slate-50/50 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-sa-wine/10 rounded-lg text-sa-wine">
+                        <i data-lucide="mail" class="w-5 h-5"></i>
+                    </div>
+                    <h2 class="font-bold text-sa-dark">Servidor de E-mail (SMTP)</h2>
+                </div>
+                <button onclick="toggleCardEdit('card-smtp')" class="p-2 text-sa-muted hover:text-sa-wine hover:bg-sa-wine/5 rounded-lg transition-all" title="Editar Configurações">
+                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <form action="{{ url_for('configuracoes') }}" method="POST" class="p-6 space-y-4">
+                <fieldset disabled class="space-y-4">
+                    <input type="hidden" name="section_type" value="smtp">
+                    <div>
+                        <label class="block text-xs font-bold text-sa-muted uppercase tracking-wider mb-2">Servidor SMTP</label>
+                        <input type="text" name="smtp_server" value="{{ email_conf.smtp_server }}" class="w-full bg-slate-50 border border-sa-gray rounded-xl px-4 py-2.5 outline-none transition-all disabled:opacity-70 disabled:cursor-not-allowed">
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-sa-muted uppercase tracking-wider mb-2">Usuário/E-mail</label>
+                            <input type="text" name="smtp_user" value="{{ email_conf.smtp_user }}" class="w-full bg-slate-50 border border-sa-gray rounded-xl px-4 py-2.5 outline-none transition-all disabled:opacity-70">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-sa-muted uppercase tracking-wider mb-2">Porta</label>
+                            <input type="number" name="smtp_port" value="{{ email_conf.smtp_port }}" class="w-full bg-slate-50 border border-sa-gray rounded-xl px-4 py-2.5 outline-none transition-all disabled:opacity-70">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-sa-muted uppercase tracking-wider mb-2">Senha App</label>
+                        <input type="password" name="smtp_pass" placeholder="••••••••••••" class="w-full bg-slate-50 border border-sa-gray rounded-xl px-4 py-2.5 outline-none transition-all disabled:opacity-70">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-sa-muted uppercase tracking-wider mb-2">Nome do Remetente</label>
+                        <input type="text" name="from_name" value="{{ email_conf.from_name }}" class="w-full bg-slate-50 border border-sa-gray rounded-xl px-4 py-2.5 outline-none transition-all disabled:opacity-70">
+                    </div>
+                    <button type="submit" class="w-full bg-sa-dark text-white font-bold py-3 rounded-xl hover:bg-black transition-all shadow-lg opacity-0 pointer-events-none transform translate-y-2 btn-save-card">
+                        Salvar Conexão
+                    </button>
+                </fieldset>
+            </form>
+        </section>
+
+        <!-- Data Management -->
+        <section class="bg-white rounded-2xl shadow-sm border border-sa-gray overflow-hidden">
+            <div class="p-6 border-b border-sa-gray bg-slate-50/50">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-emerald-100 rounded-lg text-emerald-600">
+                        <i data-lucide="database" class="w-5 h-5"></i>
+                    </div>
+                    <h2 class="font-bold text-sa-dark">Base de Dados</h2>
+                </div>
+            </div>
+            <div class="p-6 space-y-6">
+                <!-- Status da Base -->
+                <div class="grid grid-cols-2 gap-4 mb-2">
+                    <div class="bg-slate-50 p-3 rounded-xl border border-sa-gray">
+                        <span class="block text-[10px] font-bold text-sa-muted uppercase tracking-widest mb-1">Corretores</span>
+                        <span class="text-xl font-black text-sa-dark">{{ corretores_count }}</span>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl border border-sa-gray">
+                        <span class="block text-[10px] font-bold text-sa-muted uppercase tracking-widest mb-1">Supervisores</span>
+                        <span class="text-xl font-black text-sa-dark">{{ supervisores_count }}</span>
+                    </div>
+                </div>
+
+                <!-- Importar Corretores -->
+                <div>
+                    <h3 class="text-[10px] font-black text-sa-muted uppercase tracking-widest mb-3">Importar Lista de Corretores</h3>
+                    <form action="{{ url_for('importar_corretores') }}" method="POST" enctype="multipart/form-data" class="flex flex-col gap-3">
+                        <input type="file" name="file_corretores" accept=".xlsx, .xls" class="block w-full text-[10px] text-sa-muted file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-sa-gray file:text-sa-dark hover:file:bg-sa-gray/80 transition-all">
+                        <button type="submit" class="bg-sa-wine text-white text-xs font-bold py-2 rounded-lg shadow-sm hover:bg-sa-wine/90 transition-all">Upload Planilha</button>
+                    </form>
+                </div>
+                
+                <hr class="border-sa-gray">
+
+                <!-- Supervisores -->
+                <div>
+                    <h3 class="text-[10px] font-black text-sa-muted uppercase tracking-widest mb-3">Supervisores por Empreendimento</h3>
+                    <div class="space-y-3">
+                        <form action="{{ url_for('importar_supervisores') }}" method="POST" enctype="multipart/form-data" class="flex flex-col gap-3">
+                            <input type="file" name="file_supervisores" accept=".xlsx, .xls" class="block w-full text-[10px] text-sa-muted file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-bold file:bg-sa-gray file:text-sa-dark hover:file:bg-sa-gray/80 transition-all">
+                            <button type="submit" class="bg-sa-wine text-white text-xs font-bold py-2 rounded-lg shadow-sm hover:bg-sa-wine/90 transition-all">Atualizar Base</button>
+                        </form>
+                        <form action="{{ url_for('zerar_supervisores') }}" method="POST" onsubmit="return confirm('Isso apagará TODA a tabela de supervisores. Deseja continuar?')">
+                            <button type="submit" class="w-full text-[10px] font-bold text-red-500 border border-red-200 py-2 rounded-lg hover:bg-red-50 transition-all">
+                                <i data-lucide="trash-2" class="w-3 h-3 inline mr-1"></i> Limpar Tudo
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Coluna da Direita: Templates de Email -->
+    <div class="xl:col-span-2 space-y-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {% for c in configs %}
+            <div id="card-{{ loop.index }}" class="bg-white rounded-2xl shadow-sm border border-sa-gray overflow-hidden hover:shadow-md transition-all group config-card">
+                <div class="p-5 border-b border-sa-gray flex justify-between items-center group-hover:bg-slate-50 transition-all">
+                    <div>
+                        <h3 class="font-bold text-sa-dark text-lg">{{ c.tipo }}</h3>
+                        <p class="text-[10px] font-bold text-sa-muted uppercase tracking-widest mt-0.5">Template Ativo</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="toggleCardEdit('card-{{ loop.index }}')" class="p-2 text-sa-muted hover:text-sa-wine hover:bg-sa-wine/5 rounded-lg transition-all" title="Editar Template">
+                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                        </button>
+                        <div class="w-8 h-8 rounded-full bg-sa-gray flex items-center justify-center text-sa-wine group-hover:scale-110 transition-all">
+                            <i data-lucide="layout-template" class="w-4 h-4"></i>
+                        </div>
+                    </div>
+                </div>
+                <form action="{{ url_for('configuracoes') }}" method="POST" class="p-5 space-y-4">
+                    <fieldset disabled class="space-y-4">
+                        <input type="hidden" name="section_type" value="config_tipo">
+                        <input type="hidden" name="tipo_alvo" value="{{ c.tipo }}">
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-sa-muted uppercase tracking-wider mb-1">Mês Ref.</label>
+                                <input type="text" name="mes_referencia" value="{{ c.mes_referencia or '' }}" class="w-full text-sm bg-slate-50 border border-sa-gray rounded-lg px-3 py-2 outline-none transition-all disabled:opacity-70">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-sa-muted uppercase tracking-wider mb-1">Data Limite</label>
+                                <input type="text" name="data_limite_envio" value="{{ c.data_limite_envio or '' }}" class="w-full text-sm bg-slate-50 border border-sa-gray rounded-lg px-3 py-2 outline-none transition-all disabled:opacity-70">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-bold text-sa-muted uppercase tracking-wider mb-1">Pagamento</label>
+                            <input type="text" name="data_pagamento" value="{{ c.data_pagamento or '' }}" class="w-full text-sm bg-slate-50 border border-sa-gray rounded-lg px-3 py-2 outline-none transition-all disabled:opacity-70">
+                        </div>
+
+                        <div class="space-y-3 pt-2">
+                            <div>
+                                <label class="block text-[10px] font-bold text-sa-muted uppercase tracking-wider mb-1">Link Formulário Principal</label>
+                                <input type="text" name="link_form" value="{{ c.link_form or '' }}" class="w-full text-[11px] bg-slate-50 border border-sa-gray rounded-lg px-3 py-2 outline-none transition-all disabled:opacity-70 font-mono" placeholder="https://...">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-sa-muted uppercase tracking-wider mb-1">Link Formulário Retroativo</label>
+                                <input type="text" name="link_form_retroativo" value="{{ c.link_form_retroativo or '' }}" class="w-full text-[11px] bg-slate-50 border border-sa-gray rounded-lg px-3 py-2 outline-none transition-all disabled:opacity-70 font-mono" placeholder="https://...">
+                            </div>
+                        </div>
+
+                        <div class="pt-2">
+                            <a href="{{ url_for('preview_email', tipo=c.tipo) }}" target="_blank" class="block w-full text-center py-2.5 rounded-xl border border-sa-wine text-sa-wine font-bold text-xs hover:bg-sa-wine hover:text-white transition-all mb-2">
+                                <i data-lucide="eye" class="w-3 h-3 inline mr-1"></i> Visualizar E-mail
+                            </a>
+                            <button type="submit" class="w-full bg-sa-wine text-white font-bold py-2.5 rounded-xl text-xs hover:bg-sa-wine/90 transition-all opacity-0 pointer-events-none transform translate-y-2 btn-save-card">
+                                Salvar Alterações
+                            </button>
+                        </div>
+                    </fieldset>
+                </form>
+            </div>
+            {% endfor %}
         </div>
     </div>
-</form>
-{% endblock %}
+</div>
+
+<style>
+    .config-card.editing {
+        border-color: #A90011 !important;
+        box-shadow: 0 10px 15px -3px rgba(169, 0, 17, 0.1) !important;
+    }
+    .config-card.editing .btn-save-card {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        transform: translateY(0) !important;
+    }
+    .config-card.editing input {
+        background-color: white !important;
+    }
+</style>
 
 <script>
-function toggleEdit(sectionId) {
-    const section = document.getElementById(sectionId);
-    const inputs = section.querySelectorAll('input, textarea');
-    const isLocked = section.classList.contains('pointer-events-none');
+function toggleCardEdit(cardId) {
+    const card = document.getElementById(cardId);
+    const fieldset = card.querySelector('fieldset');
+    const isEditing = card.classList.contains('editing');
     
-    if (isLocked) {
-        section.classList.remove('pointer-events-none', 'opacity-80');
-        inputs.forEach(input => {
-            input.removeAttribute('readonly');
-            input.classList.replace('bg-slate-50', 'bg-white');
-        });
+    // Toggle class
+    card.classList.toggle('editing');
+    
+    // Toggle inputs
+    fieldset.disabled = isEditing;
+    
+    // Change icon color/background
+    const btn = card.querySelector('button[onclick^="toggleCardEdit"]');
+    if (!isEditing) {
+        btn.classList.add('bg-sa-wine', 'text-white');
+        btn.classList.remove('text-sa-muted');
     } else {
-        section.classList.add('pointer-events-none', 'opacity-80');
-        inputs.forEach(input => {
-            input.setAttribute('readonly', true);
-            input.classList.replace('bg-white', 'bg-slate-50');
-        });
+        btn.classList.remove('bg-sa-wine', 'text-white');
+        btn.classList.add('text-sa-muted');
+    }
+    
+    // Auto-focus first input
+    if (!isEditing) {
+        const firstInput = fieldset.querySelector('input:not([type="hidden"])');
+        if (firstInput) firstInput.focus();
     }
 }
 </script>
+{% endblock %}

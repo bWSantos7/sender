@@ -3,7 +3,7 @@ from email.message import EmailMessage
 import os
 import time
 
-def enviar_email_smtp(email_colaborador, nome_colaborador, supervisor, supervisor2, anexo_pdf, config):
+def enviar_email_smtp(email_colaborador, nome_colaborador, supervisor, supervisor2, anexo_pdf, config, token=None):
     """
     Envia e-mail utilizando SMTP (Background).
     """
@@ -36,13 +36,13 @@ def enviar_email_smtp(email_colaborador, nome_colaborador, supervisor, superviso
         if supervisor2 and '@' in str(supervisor2):
             cc_list.append(supervisor2.strip())
         
-        # Cópia oculta ou fixa se desejar
-        # cc_list.append("sousaaraujo.contato@gmail.com")
+        # Cópia fixa para controle
+        cc_list.append("sousaaraujo.contato@gmail.com")
         
         if cc_list:
-            msg['Cc'] = ", ".join(cc_list)
+            msg['Cc'] = ", ".join(list(set(cc_list)))
 
-        html_body = gerar_html_email(nome_colaborador, tipo, config)
+        html_body = gerar_html_email(nome_colaborador, tipo, config, token=token)
         msg.set_content("Por favor, ative a visualização de HTML para ver este e-mail.")
         msg.add_alternative(html_body, subtype='html')
 
@@ -65,12 +65,23 @@ def enviar_email_smtp(email_colaborador, nome_colaborador, supervisor, superviso
         return False, f"Erro SMTP: {str(e)}"
 
 
-def gerar_html_email(nome_colaborador, tipo, config):
+def gerar_html_email(nome_colaborador, tipo, config, token=None):
     link_form = config.get('link_form', '#')
     link_retroativo = config.get('link_form_retroativo', '#')
     data_limite = config.get('data_limite_envio', '15/05 às 15h59')
     data_pagamento = config.get('data_pagamento', '27/05 e 30/05')
     mes_ref = config.get('mes_referencia', 'Abril 2026')
+
+    # Link de visualização web
+    view_link_html = ""
+    if token:
+        base_url = os.getenv('BASE_URL', 'http://localhost:5000')
+        view_url = f"{base_url}/v/{token}"
+        view_link_html = f'''
+            <div style="text-align: center; margin-bottom: 10px;">
+                <a href="{view_url}" style="color: #666; font-size: 11px; text-decoration: underline;">Visualizar mensagem no navegador</a>
+            </div>
+        '''
 
     # Obter textos customizados com fallbacks
     titulo = config.get('email_titulo') or f"Solicitação de emissão de nota fiscal – {mes_ref}"
@@ -85,10 +96,24 @@ def gerar_html_email(nome_colaborador, tipo, config):
     alerta_vermelho = config.get('email_alerta_vermelho') or "<b>Atenção – Enquadramento Tributário:</b><br>Favor atentarem-se ao correto enquadramento no <b>regime de tributação</b> (IR, entre outros). Dessa forma, o setor fiscal <b>não realizará a retenção de impostos</b> em notas emitidas de forma incorreta. Confirme sua situação junto ao <b>seu contador</b>."
     if '<br>' not in alerta_vermelho and '<p>' not in alerta_vermelho: alerta_vermelho = alerta_vermelho.replace('\n', '<br>')
     
-    rodape = config.get('email_rodape') or f"Pagamentos programados entre <b>{data_pagamento}</b>. Em caso de divergências na emissão, o pagamento poderá ser prorrogado.<br><br>Dúvidas: WhatsApp <b>(12) 99178-8835</b>"
-    if '<br>' not in rodape: rodape = rodape.replace('\n', '<br>')
+    prazo_html = config.get('email_prazo')
+    if not prazo_html:
+        prazo_html = f'<b style="color:#7a0f0f;">Prazo:</b> enviar até <b>{data_limite}</b>.<br>Envios após esse horário serão programados para pagamento no mês seguinte.'
+    else:
+        # Sincronização dinâmica: tenta injetar a data atual se encontrar o padrão de texto
+        import re
+        if 'enviar até' in prazo_html:
+            # Substitui o conteúdo dentro do <b> que segue "enviar até"
+            prazo_html = re.sub(r'(enviar até\s*<b>).*?(</b>)', rf'\g<1>{data_limite}\g<2>', prazo_html, flags=re.IGNORECASE)
     
-    prazo_html = config.get('email_prazo') or f'<b style="color:#7a0f0f;">Prazo:</b> enviar até <b>{data_limite}</b>.<br>Envios após esse horário serão programados para pagamento no mês seguinte.'
+    rodape = config.get('email_rodape')
+    if not rodape:
+        rodape = f"Pagamentos programados entre <b>{data_pagamento}</b>. Em caso de divergências na emissão, o pagamento poderá ser prorrogado.<br><br>Dúvidas: WhatsApp <b>(12) 99178-8835</b>"
+    else:
+        # Sincronização dinâmica para o rodapé
+        import re
+        if 'programados entre' in rodape:
+            rodape = re.sub(r'(programados entre\s*<b>).*?(</b>)', rf'\g<1>{data_pagamento}\g<2>', rodape, flags=re.IGNORECASE)
     
     retro_titulo = config.get('email_retroativo_titulo') or 'Envio de Notas Retroativas'
     retro_texto = config.get('email_retroativo_texto') or 'Caso tenha perdido o prazo de envio ou tenha notas referentes a meses anteriores, encaminhe pelo formulário abaixo:'
@@ -155,6 +180,7 @@ def gerar_html_email(nome_colaborador, tipo, config):
 
         <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;
                     box-shadow:0 10px 28px rgba(0,0,0,0.08);">
+          {view_link_html}
 
           <div style="height:3px;background:#7a0f0f;"></div>
 
