@@ -3,6 +3,7 @@ Werkzeug==2.3.8
 Flask-SQLAlchemy==3.0.2
 pandas==2.0.3
 numpy<2.0.0
+reportlab==3.6.12
 openpyxl==3.0.10
 fpdf2==2.6.0
 python-dotenv==0.21.0
