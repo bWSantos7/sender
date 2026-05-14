@@ -48,6 +48,20 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 
+# Inicialização do Banco de Dados (Executa no deploy)
+with app.app_context():
+    db.create_all()
+    if User.query.count() == 0:
+        admin_pw = os.getenv('ADMIN_PASSWORD', 'admin123')
+        admin = User(
+            username='admin',
+            password_hash=generate_password_hash(admin_pw),
+            role='admin',
+            is_admin=True
+        )
+        db.session.add(admin)
+        db.session.commit()
+
 # Mapeamento de Regionais
 MAPA_REGIONAIS = {
     "AMETISTA": "GRANDE CAMPINAS",
