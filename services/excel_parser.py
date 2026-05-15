@@ -13,11 +13,18 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
             # 1. Lógica para House e Staff (Via Aba de Dados ou Fechamento Comercial)
             if tipo_envio in ['House', 'Staff']:
                 aba_dados = None
+                # 1. Primeiro tenta encontrar EXATAMENTE "Fechamento Comercial"
                 for aba in abas:
-                    aba_l = aba.lower()
-                    if 'fechamento comercial' in aba_l or 'comissoes_parti' in aba_l:
+                    if 'fechamento comercial' in aba.lower():
                         aba_dados = aba
                         break
+                
+                # 2. Se não achou, tenta a alternativa comissoes_parti
+                if not aba_dados:
+                    for aba in abas:
+                        if 'comissoes_parti' in aba.lower():
+                            aba_dados = aba
+                            break
                 
                 if not aba_dados:
                     raise ValueError("Aba 'Fechamento Comercial' ou de dados brutos não encontrada.")
