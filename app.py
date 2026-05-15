@@ -187,9 +187,13 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    total_enviados = EnvioLog.query.filter_by(status='Sucesso').count()
-    total_erros = EnvioLog.query.filter_by(status='Erro').count()
-    ultimos_logs = EnvioLog.query.order_by(EnvioLog.data_envio.desc()).limit(10).all()
+    query = EnvioLog.query
+    if current_user.role != 'admin':
+        query = query.filter_by(regional=current_user.regional)
+    
+    total_enviados = query.filter_by(status='Sucesso').count()
+    total_erros = query.filter_by(status='Erro').count()
+    ultimos_logs = query.order_by(EnvioLog.data_envio.desc()).limit(50).all()
     return render_template('dashboard.html', total_enviados=total_enviados, total_erros=total_erros, logs=ultimos_logs)
 
 @app.route('/upload', methods=['GET', 'POST'])

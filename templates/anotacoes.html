@@ -116,6 +116,19 @@
         transition: all 0.2s;
     }
     .sheet-selector:hover { border-color: #720917; }
+
+    /* Estilos para os filtros de coluna */
+    .filter-row th { background: #f9fafb !important; padding: 4px 8px !important; border: 1px solid #d1d5db; }
+    .filter-input {
+        width: 100%;
+        padding: 4px 8px;
+        font-size: 10px;
+        border: 1px solid #e5e7eb;
+        border-radius: 4px;
+        outline: none;
+        background: white;
+    }
+    .filter-input:focus { border-color: #720917; ring: 1px solid #720917; }
 </style>
 
 <div class="mb-4 px-4 flex justify-between items-center">
@@ -149,6 +162,14 @@
             </button>
             {% endif %}
             <input type="text" id="planilha-titulo" disabled class="bg-transparent font-bold text-gray-800 text-xl border-none outline-none focus:ring-0 flex-1" placeholder="Título da Planilha">
+            
+            <!-- Busca Global -->
+            <div class="relative w-64 mr-4">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"></i>
+                <input type="text" id="busca-global" onkeyup="aplicarFiltros()" placeholder="Buscar na planilha..." 
+                       class="w-full pl-9 pr-4 py-1.5 text-xs bg-slate-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-sa-wine outline-none transition-all">
+            </div>
+
             <span id="save-status" class="text-[10px] font-black text-emerald-500 opacity-0 shrink-0">✓ SALVO</span>
         </div>
         
@@ -176,7 +197,10 @@
             <p class="text-gray-400 mt-2">Selecione no menu acima ou crie uma nova.</p>
         </div>
         <table class="excel-style hidden" id="main-table">
-            <thead><tr id="table-head"></tr></thead>
+            <thead>
+                <tr id="table-head"></tr>
+                <tr id="filter-row" class="filter-row"></tr>
+            </thead>
             <tbody id="table-body"></tbody>
         </table>
     </div>
@@ -204,6 +228,7 @@ let currentCols = [];
 let currentRows = [];
 let isEditing = false;
 let colWidths = {};
+let filtrosColuna = {}; // Armazena filtros por coluna
 
 function initResize(e, idx) {
     const th = e.target.parentElement.parentElement;
@@ -257,14 +282,26 @@ function toggleEditMode() {
     renderTable();
 }
 
+function aplicarFiltros() {
+    // Atualizar filtros das colunas a partir dos inputs
+    currentCols.forEach((col, idx) => {
+        const input = document.getElementById(`filter-${idx}`);
+        if (input) filtrosColuna[col] = input.value.toLowerCase();
+    });
+    renderTable();
+}
+
 function renderTable() {
     const head = document.getElementById('table-head');
+    const filterRow = document.getElementById('filter-row');
     const body = document.getElementById('table-body');
     const table = document.getElementById('main-table');
     const vazio = document.getElementById('editor-vazio');
+    
     if (currentCols.length === 0) { table.classList.add('hidden'); vazio.classList.remove('hidden'); return; }
     table.classList.remove('hidden'); vazio.classList.add('hidden');
     
+    // Renderizar Cabeçalhos
     head.innerHTML = currentCols.map((col, idx) => `
         <th style="width: ${colWidths[idx] || 180}px">
             <div class="th-content">
@@ -275,18 +312,51 @@ function renderTable() {
         </th>
     `).join('') + (isEditing ? '<th class="w-10"></th>' : '');
 
-    body.innerHTML = currentRows.map((row, rIdx) => `
-        <tr>
-            ${currentCols.map(col => {
-                const val = row[col] || '';
-                if (col.toUpperCase() === 'SITUAÇÃO') {
-                    return `<td><select ${!isEditing ? 'disabled' : ''} onchange="updateCell(${rIdx}, '${col}', this.value)" class="cell-select ${getStatusClass(val)}"><option value="">-</option>${STATUS_OPTIONS.map(opt => `<option value="${opt}" ${val === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select></td>`;
+    // Renderizar Linha de Filtros
+    filterRow.innerHTML = currentCols.map((col, idx) => `
+        <th>
+            <input type="text" id="filter-${idx}" value="${filtrosColuna[col] || ''}" onkeyup="aplicarFiltros()" placeholder="Filtrar..." class="filter-input">
+        </th>
+    `).join('') + (isEditing ? '<th></th>' : '');
+
+    // Filtragem dos Dados
+    const buscaGlobal = document.getElementById('busca-global').value.toLowerCase();
+    
+    const rowsHtml = currentRows.map((row, rIdx) => {
+        // Verificar Filtro Global
+        const rowValues = Object.values(row).join(' ').toLowerCase();
+        const bateGlobal = buscaGlobal === "" || rowValues.includes(buscaGlobal);
+        
+        // Verificar Filtros por Coluna
+        let bateColunas = true;
+        for (let col of currentCols) {
+            const valFiltro = filtrosColuna[col] || "";
+            if (valFiltro !== "") {
+                const valCelula = String(row[col] || "").toLowerCase();
+                if (!valCelula.includes(valFiltro)) {
+                    bateColunas = false;
+                    break;
                 }
-                return `<td><input type="text" value="${val}" ${!isEditing ? 'disabled' : ''} onchange="updateCell(${rIdx}, '${col}', this.value)" onpaste="handlePaste(event, ${rIdx}, '${col}')" class="cell-input"></td>`;
-            }).join('')}
-            ${isEditing ? `<td class="text-center"><button onclick="removeRow(${rIdx})" class="text-gray-400 hover:text-red-500"><i data-lucide="minus" class="w-4 h-4"></i></button></td>` : ''}
-        </tr>
-    `).join('');
+            }
+        }
+
+        if (!bateGlobal || !bateColunas) return null;
+
+        return `
+            <tr>
+                ${currentCols.map(col => {
+                    const val = row[col] || '';
+                    if (col.toUpperCase() === 'SITUAÇÃO') {
+                        return `<td><select ${!isEditing ? 'disabled' : ''} onchange="updateCell(${rIdx}, '${col}', this.value)" class="cell-select ${getStatusClass(val)}"><option value="">-</option>${STATUS_OPTIONS.map(opt => `<option value="${opt}" ${val === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select></td>`;
+                    }
+                    return `<td><input type="text" value="${val}" ${!isEditing ? 'disabled' : ''} onchange="updateCell(${rIdx}, '${col}', this.value)" onpaste="handlePaste(event, ${rIdx}, '${col}')" class="cell-input"></td>`;
+                }).join('')}
+                ${isEditing ? `<td class="text-center"><button onclick="removeRow(${rIdx})" class="text-gray-400 hover:text-red-500"><i data-lucide="minus" class="w-4 h-4"></i></button></td>` : ''}
+            </tr>
+        `;
+    }).filter(h => h !== null).join('');
+
+    body.innerHTML = rowsHtml;
     try {
         lucide.createIcons();
     } catch (e) {

@@ -42,11 +42,29 @@
     <div class="px-6 py-4 border-b border-sa-gray bg-slate-50 flex justify-between items-center">
         <h3 class="text-xs font-bold text-sa-text uppercase tracking-widest">Relatório de Envios</h3>
         
-        <!-- Barra de Busca -->
-        <div class="relative w-64">
-            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-sa-muted"></i>
-            <input type="text" id="input-busca" placeholder="Buscar corretor ou tipo..." onkeyup="filtrarTabela()" 
-                   class="w-full pl-9 pr-4 py-1.5 text-xs bg-white border border-sa-gray rounded-lg focus:ring-1 focus:ring-sa-wine outline-none transition-all">
+        <!-- Filtros Avançados -->
+        <div class="flex items-center gap-3">
+            <select id="filtro-tipo" onchange="filtrarTabela()" class="bg-white border border-sa-gray rounded-lg px-2 py-1.5 text-[10px] font-bold text-sa-muted uppercase outline-none focus:ring-1 focus:ring-sa-wine">
+                <option value="">TODOS OS TIPOS</option>
+                <option value="Adiantamento">Adiantamento</option>
+                <option value="Repasse">Repasse</option>
+                <option value="Prêmio">Prêmio</option>
+                <option value="Premiação - Metas">Premiação - Metas</option>
+                <option value="House">House</option>
+                <option value="Staff">Staff</option>
+            </select>
+
+            <select id="filtro-status" onchange="filtrarTabela()" class="bg-white border border-sa-gray rounded-lg px-2 py-1.5 text-[10px] font-bold text-sa-muted uppercase outline-none focus:ring-1 focus:ring-sa-wine">
+                <option value="">TODOS OS STATUS</option>
+                <option value="CONCLUÍDO">CONCLUÍDO</option>
+                <option value="ERRO">ERRO</option>
+            </select>
+
+            <div class="relative w-48">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-sa-muted"></i>
+                <input type="text" id="input-busca" placeholder="Buscar corretor..." onkeyup="filtrarTabela()" 
+                       class="w-full pl-9 pr-4 py-1.5 text-xs bg-white border border-sa-gray rounded-lg focus:ring-1 focus:ring-sa-wine outline-none transition-all">
+            </div>
         </div>
     </div>
     <div class="overflow-x-auto">
@@ -71,11 +89,13 @@
                     </td>
                     <td class="px-6 py-4 text-sa-muted max-w-[160px] truncate col-cc" title="{{ log.cc_emails or '' }}">{{ log.cc_emails or '-' }}</td>
                     <td class="px-6 py-4">
-                        {% if log.status == 'Sucesso' %}
-                        <span class="text-emerald-600 font-bold uppercase">CONCLUÍDO</span>
-                        {% else %}
-                        <span class="text-sa-red font-bold uppercase" title="{{ log.mensagem_erro }}">ERRO</span>
-                        {% endif %}
+                        <span class="col-status">
+                            {% if log.status == 'Sucesso' %}
+                            <span class="text-emerald-600 font-bold uppercase">CONCLUÍDO</span>
+                            {% else %}
+                            <span class="text-sa-red font-bold uppercase" title="{{ log.mensagem_erro }}">ERRO</span>
+                            {% endif %}
+                        </span>
                     </td>
                     <td class="px-6 py-4 text-right">
                         {% if log.caminho_anexo %}
@@ -93,8 +113,10 @@
 
 <script>
 function filtrarTabela() {
-    const input = document.getElementById('input-busca');
-    const filter = input.value.toLowerCase();
+    const busca = document.getElementById('input-busca').value.toLowerCase();
+    const tipoFiltro = document.getElementById('filtro-tipo').value.toLowerCase();
+    const statusFiltro = document.getElementById('filtro-status').value.toLowerCase();
+    
     const rows = document.querySelectorAll('.log-row');
 
     rows.forEach(row => {
@@ -102,7 +124,13 @@ function filtrarTabela() {
         const email = row.querySelector('.col-email').innerText.toLowerCase();
         const tipo = row.querySelector('.col-tipo').innerText.toLowerCase();
         const cc = row.querySelector('.col-cc').innerText.toLowerCase();
-        if (corretor.includes(filter) || email.includes(filter) || tipo.includes(filter) || cc.includes(filter)) {
+        const status = row.querySelector('.col-status').innerText.toLowerCase();
+
+        const bateBusca = corretor.includes(busca) || email.includes(busca) || cc.includes(busca);
+        const bateTipo = tipoFiltro === "" || tipo === tipoFiltro;
+        const bateStatus = statusFiltro === "" || status.includes(statusFiltro);
+
+        if (bateBusca && bateTipo && bateStatus) {
             row.style.display = "";
         } else {
             row.style.display = "none";
@@ -130,7 +158,10 @@ function updateDashboard() {
         
         const tbody = document.getElementById('logs-tbody');
         if (data.logs && data.logs.length > 0) {
-            if (document.getElementById('input-busca').value !== '') return;
+            // Não atualizar o HTML se o usuário estiver filtrando
+            if (document.getElementById('input-busca').value !== '' || 
+                document.getElementById('filtro-tipo').value !== '' || 
+                document.getElementById('filtro-status').value !== '') return;
 
             let html = '';
             data.logs.forEach(log => {
