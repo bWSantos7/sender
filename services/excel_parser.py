@@ -56,7 +56,7 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
                     'dataframe': df_flat,
                     'corretores': corretores_nomes,
                     'empreendimentos_por_corretor': empreendimentos_por_corretor,
-                    'aba_lida': aba_dados
+                    'aba_lida': abas[0]
                 }
 
             # 2. Lógica para Prêmio (Padrão Flat ou Pivot)
