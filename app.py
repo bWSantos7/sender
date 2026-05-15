@@ -189,7 +189,9 @@ def logout():
 def index():
     query = EnvioLog.query
     if current_user.role != 'admin':
-        query = query.filter_by(regional=current_user.regional)
+        # Mostrar logs da regional do usuário OU logs antigos que estão sem regional (None)
+        from sqlalchemy import or_
+        query = query.filter(or_(EnvioLog.regional == current_user.regional, EnvioLog.regional == None))
     
     total_enviados = query.filter_by(status='Sucesso').count()
     total_erros = query.filter_by(status='Erro').count()

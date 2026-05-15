@@ -283,12 +283,41 @@ function toggleEditMode() {
 }
 
 function aplicarFiltros() {
-    // Atualizar filtros das colunas a partir dos inputs
-    currentCols.forEach((col, idx) => {
+    const buscaGlobal = document.getElementById('busca-global').value.toLowerCase();
+    const headers = currentCols;
+    
+    // Pegar todos os valores dos filtros de coluna
+    const filtros = headers.map((col, idx) => {
         const input = document.getElementById(`filter-${idx}`);
-        if (input) filtrosColuna[col] = input.value.toLowerCase();
+        return input ? input.value.toLowerCase() : "";
     });
-    renderTable();
+
+    const rows = document.querySelectorAll('#table-body tr');
+    rows.forEach((row, rIdx) => {
+        const cells = row.querySelectorAll('td');
+        let bateColunas = true;
+        let rowText = "";
+
+        cells.forEach((td, cIdx) => {
+            if (cIdx >= headers.length) return; // Pula coluna de ação
+            
+            const input = td.querySelector('input, select');
+            const val = input ? input.value.toLowerCase() : "";
+            rowText += val + " ";
+
+            if (filtros[cIdx] !== "" && !val.includes(filtros[cIdx])) {
+                bateColunas = false;
+            }
+        });
+
+        const bateGlobal = buscaGlobal === "" || rowText.includes(buscaGlobal);
+
+        if (bateGlobal && bateColunas) {
+            row.style.display = "";
+        } else {
+            row.style.display = "none";
+        }
+    });
 }
 
 function renderTable() {
@@ -301,7 +330,7 @@ function renderTable() {
     if (currentCols.length === 0) { table.classList.add('hidden'); vazio.classList.remove('hidden'); return; }
     table.classList.remove('hidden'); vazio.classList.add('hidden');
     
-    // Renderizar Cabeçalhos
+    // Renderizar Cabeçalhos (Sempre reconstrói se mudar de planilha ou colunas)
     head.innerHTML = currentCols.map((col, idx) => `
         <th style="width: ${colWidths[idx] || 180}px">
             <div class="th-content">
@@ -312,51 +341,29 @@ function renderTable() {
         </th>
     `).join('') + (isEditing ? '<th class="w-10"></th>' : '');
 
-    // Renderizar Linha de Filtros
+    // Renderizar Linha de Filtros (Apenas se não existir ou se colunas mudaram)
     filterRow.innerHTML = currentCols.map((col, idx) => `
         <th>
-            <input type="text" id="filter-${idx}" value="${filtrosColuna[col] || ''}" onkeyup="aplicarFiltros()" placeholder="Filtrar..." class="filter-input">
+            <input type="text" id="filter-${idx}" onkeyup="aplicarFiltros()" placeholder="Filtrar..." class="filter-input">
         </th>
     `).join('') + (isEditing ? '<th></th>' : '');
 
-    // Filtragem dos Dados
-    const buscaGlobal = document.getElementById('busca-global').value.toLowerCase();
-    
-    const rowsHtml = currentRows.map((row, rIdx) => {
-        // Verificar Filtro Global
-        const rowValues = Object.values(row).join(' ').toLowerCase();
-        const bateGlobal = buscaGlobal === "" || rowValues.includes(buscaGlobal);
-        
-        // Verificar Filtros por Coluna
-        let bateColunas = true;
-        for (let col of currentCols) {
-            const valFiltro = filtrosColuna[col] || "";
-            if (valFiltro !== "") {
-                const valCelula = String(row[col] || "").toLowerCase();
-                if (!valCelula.includes(valFiltro)) {
-                    bateColunas = false;
-                    break;
+    // Renderizar todas as linhas iniciais
+    body.innerHTML = currentRows.map((row, rIdx) => `
+        <tr>
+            ${currentCols.map(col => {
+                const val = row[col] || '';
+                if (col.toUpperCase() === 'SITUAÇÃO') {
+                    return `<td><select ${!isEditing ? 'disabled' : ''} onchange="updateCell(${rIdx}, '${col}', this.value)" class="cell-select ${getStatusClass(val)}"><option value="">-</option>${STATUS_OPTIONS.map(opt => `<option value="${opt}" ${val === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select></td>`;
                 }
-            }
-        }
+                return `<td><input type="text" value="${val}" ${!isEditing ? 'disabled' : ''} onchange="updateCell(${rIdx}, '${col}', this.value)" onpaste="handlePaste(event, ${rIdx}, '${col}')" class="cell-input"></td>`;
+            }).join('')}
+            ${isEditing ? `<td class="text-center"><button onclick="removeRow(${rIdx})" class="text-gray-400 hover:text-red-500"><i data-lucide="minus" class="w-4 h-4"></i></button></td>` : ''}
+        </tr>
+    `).join('');
 
-        if (!bateGlobal || !bateColunas) return null;
-
-        return `
-            <tr>
-                ${currentCols.map(col => {
-                    const val = row[col] || '';
-                    if (col.toUpperCase() === 'SITUAÇÃO') {
-                        return `<td><select ${!isEditing ? 'disabled' : ''} onchange="updateCell(${rIdx}, '${col}', this.value)" class="cell-select ${getStatusClass(val)}"><option value="">-</option>${STATUS_OPTIONS.map(opt => `<option value="${opt}" ${val === opt ? 'selected' : ''}>${opt}</option>`).join('')}</select></td>`;
-                    }
-                    return `<td><input type="text" value="${val}" ${!isEditing ? 'disabled' : ''} onchange="updateCell(${rIdx}, '${col}', this.value)" onpaste="handlePaste(event, ${rIdx}, '${col}')" class="cell-input"></td>`;
-                }).join('')}
-                ${isEditing ? `<td class="text-center"><button onclick="removeRow(${rIdx})" class="text-gray-400 hover:text-red-500"><i data-lucide="minus" class="w-4 h-4"></i></button></td>` : ''}
-            </tr>
-        `;
-    }).filter(h => h !== null).join('');
-
-    body.innerHTML = rowsHtml;
+    // Aplicar filtros iniciais se houver busca global digitada
+    if (document.getElementById('busca-global').value !== "") aplicarFiltros();
     try {
         lucide.createIcons();
     } catch (e) {
