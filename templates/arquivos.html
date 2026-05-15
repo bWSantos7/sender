@@ -10,6 +10,12 @@
             <p class="text-xs text-sa-muted mt-1 font-medium">Selecione arquivos para download ou exclusão.</p>
         </div>
         <div class="flex gap-2">
+            <button onclick="document.getElementById('input-manual-upload').click()" class="px-5 py-2.5 border border-sa-wine text-sa-wine rounded text-[10px] font-bold uppercase tracking-widest hover:bg-red-50 transition-all flex items-center gap-2">
+                <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                SUBIR ARQUIVOS
+            </button>
+            <input type="file" id="input-manual-upload" multiple class="hidden" onchange="iniciarUploadManual(this)">
+            
             <button onclick="baixarSelecionados()" class="px-5 py-2.5 bg-sa-wine text-white rounded text-[10px] font-bold uppercase tracking-widest hover:bg-sa-red transition-all flex items-center gap-2">
                 <i data-lucide="download" class="w-3.5 h-3.5"></i>
                 BAIXAR (.ZIP)
@@ -18,6 +24,37 @@
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 EXCLUIR
             </button>
+        </div>
+    </div>
+
+    <!-- Modal Simples de Seleção de Pasta -->
+    <div id="modal-upload" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 space-y-6">
+            <div class="text-center">
+                <h3 class="text-lg font-bold text-sa-text uppercase tracking-widest">Enviar para qual pasta?</h3>
+                <p class="text-xs text-sa-muted mt-2">Os arquivos serão salvos na categoria selecionada.</p>
+            </div>
+            
+            <div class="space-y-3">
+                <select id="select-tipo-upload" class="w-full p-3 bg-slate-50 border border-sa-gray rounded text-xs outline-none focus:border-sa-wine transition-all">
+                    <option value="Adiantamento">Adiantamento</option>
+                    <option value="Repasse">Repasse</option>
+                    <option value="Prêmio">Prêmio</option>
+                    <option value="Premiação - Metas">Premiação - Metas</option>
+                    <option value="House">House</option>
+                    <option value="Staff">Staff</option>
+                    <option value="Outros">Outros</option>
+                </select>
+            </div>
+
+            <div class="flex gap-3 pt-4">
+                <button onclick="confirmarUpload(event)" class="flex-1 py-3 bg-sa-wine text-white rounded text-[10px] font-bold uppercase tracking-widest hover:bg-sa-red transition-all">
+                    Confirmar Envio
+                </button>
+                <button onclick="fecharModal()" class="flex-1 py-3 border border-sa-gray text-sa-muted rounded text-[10px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all">
+                    Cancelar
+                </button>
+            </div>
         </div>
     </div>
 
@@ -83,6 +120,50 @@ function excluirSelecionados() {
     if (paths.length === 0) return;
     if (!confirm(`Excluir ${paths.length} arquivos?`)) return;
     fetch('/api/excluir_arquivos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ arquivos: paths }) }).then(() => window.location.reload());
+}
+
+let arquivosParaSubir = null;
+function iniciarUploadManual(input) {
+    if (input.files.length > 0) {
+        arquivosParaSubir = input.files;
+        document.getElementById('modal-upload').classList.remove('hidden');
+    }
+}
+function fecharModal() {
+    document.getElementById('modal-upload').classList.add('hidden');
+    document.getElementById('input-manual-upload').value = '';
+}
+function confirmarUpload(event) {
+    if (!arquivosParaSubir) return;
+    
+    const tipo = document.getElementById('select-tipo-upload').value;
+    const formData = new FormData();
+    formData.append('tipo', tipo);
+    for (let i = 0; i < arquivosParaSubir.length; i++) {
+        formData.append('files', arquivosParaSubir[i]);
+    }
+
+    const btn = event.target;
+    const originalText = btn.innerText;
+    btn.innerText = 'ENVIANDO...';
+    btn.disabled = true;
+
+    fetch('/api/upload_manual', {
+        method: 'POST',
+        body: formData
+    }).then(r => r.json()).then(data => {
+        if (data.sucesso) {
+            window.location.reload();
+        } else {
+            alert('Erro: ' + data.erro);
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    }).catch(err => {
+        alert('Erro de conexão');
+        btn.innerText = originalText;
+        btn.disabled = false;
+    });
 }
 </script>
 {% endblock %}

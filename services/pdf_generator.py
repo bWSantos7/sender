@@ -13,14 +13,15 @@ WHITE = colors.white
 
 # Caminho do logo
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LOGO_PATH = os.path.join(BASE_DIR, "pdf_gen", "logo.png")
+LOGO_PATH = os.path.join(BASE_DIR, "logo.png")
 
 def gerar_pdfs(df, tipo_envio, mes_referencia, link_form):
     """
     Gera PDFs agrupados por beneficiário.
     Salva os PDFs em uploads/{tipo_envio}/
     """
-    pasta_destino = os.path.join(BASE_DIR, "uploads", tipo_envio.lower())
+    tipo_folder = tipo_envio.lower()
+    pasta_destino = os.path.join(BASE_DIR, "uploads", tipo_folder)
     os.makedirs(pasta_destino, exist_ok=True)
     
     pdfs_gerados = []
@@ -34,6 +35,9 @@ def gerar_pdfs(df, tipo_envio, mes_referencia, link_form):
             # Limpar nome do arquivo
             nome_arquivo = f"{str(beneficiario).replace('/', '-').replace(':', '')}.pdf"
             caminho_pdf = os.path.join(pasta_destino, nome_arquivo)
+            
+            # Caminho relativo para o banco (ex: premiação - metas/Arquivo.pdf)
+            caminho_relativo = f"{tipo_folder}/{nome_arquivo}"
             
             c = canvas.Canvas(caminho_pdf, pagesize=landscape(A4))
             width, height = landscape(A4)
@@ -228,7 +232,8 @@ def gerar_pdfs(df, tipo_envio, mes_referencia, link_form):
             
             pdfs_gerados.append({
                 'corretor': beneficiario,
-                'caminho': caminho_pdf
+                'caminho': caminho_pdf,
+                'caminho_relativo': caminho_relativo
             })
             
         except Exception as e:

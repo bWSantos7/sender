@@ -271,7 +271,7 @@ def upload():
             novo_fila = FilaUpload(
                 corretor_nome=corretor_nome,
                 tipo=tipo_envio,
-                caminho_pdf=pdf_data['caminho'],
+                caminho_pdf=pdf_data['caminho_relativo'],
                 empreendimentos=emps,
                 destinatario_email=dest_email,
                 cc_emails=cc_emails_str,
@@ -523,12 +523,21 @@ def processar_fila_background():
             db.session.add(log)
             db.session.commit()
 
+            # Resolver caminho do anexo (Suporte a caminhos antigos e novos)
+            anexo_path = item.caminho_pdf
+            if '\\' in anexo_path or ':' in anexo_path:
+                # Caminho antigo do Windows - pega só o nome do arquivo
+                nome_f = anexo_path.replace('\\', '/').split('/')[-1]
+                anexo_path = os.path.join(app.root_path, 'uploads', item.tipo.lower(), nome_f)
+            elif not os.path.isabs(anexo_path):
+                anexo_path = os.path.join(app.root_path, 'uploads', anexo_path)
+
             sucesso, msg = enviar_email_smtp(
                 email_colaborador=item.destinatario_email,
                 nome_colaborador=item.corretor_nome,
                 supervisor=item.cc_emails,
                 supervisor2=None,
-                anexo_pdf=item.caminho_pdf,
+                anexo_pdf=anexo_path,
                 config=config_dict,
                 token=log.token
             )
@@ -740,12 +749,20 @@ def enviar_unidade():
         db.session.add(log)
         db.session.commit()
 
+        # Resolver caminho do anexo
+        anexo_path = item.caminho_pdf
+        if '\\' in anexo_path or ':' in anexo_path:
+            nome_f = anexo_path.replace('\\', '/').split('/')[-1]
+            anexo_path = os.path.join(app.root_path, 'uploads', item.tipo.lower(), nome_f)
+        elif not os.path.isabs(anexo_path):
+            anexo_path = os.path.join(app.root_path, 'uploads', anexo_path)
+
         sucesso, msg = enviar_email_smtp(
             email_colaborador=item.destinatario_email,
             nome_colaborador=item.corretor_nome,
             supervisor=item.cc_emails,
             supervisor2=None,
-            anexo_pdf=item.caminho_pdf,
+            anexo_pdf=anexo_path,
             config=config_dict,
             token=log.token
         )
@@ -881,6 +898,7 @@ def arquivos():
                 
     return render_template('arquivos.html', arquivos=lista_arquivos)
 
+
 @app.route('/api/excluir_arquivos', methods=['POST'])
 def excluir_arquivos():
     data = request.json
@@ -908,6 +926,25 @@ def visualizar_arquivo(filename):
     if os.path.exists(caminho):
         return send_file(caminho)
     return "Arquivo não encontrado", 404
+
+@app.route('/api/upload_manual', methods=['POST'])
+def upload_manual():
+    tipo = request.form.get('tipo', 'Outros').lower()
+    files = request.files.getlist('files')
+    
+    if not files or files[0].filename == '':
+        return jsonify({'sucesso': False, 'erro': 'Nenhum arquivo selecionado.'}), 400
+        
+    base_uploads = os.path.join(app.root_path, 'uploads', tipo)
+    os.makedirs(base_uploads, exist_ok=True)
+    
+    sucesso = 0
+    for file in files:
+        if file.filename:
+            file.save(os.path.join(base_uploads, file.filename))
+            sucesso += 1
+            
+    return jsonify({'sucesso': True, 'mensagem': f'{sucesso} arquivos enviados com sucesso.'})
 
 @app.route('/api/download_massa')
 def download_massa():
