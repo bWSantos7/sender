@@ -1,7 +1,20 @@
-__pycache__/
 instance/
-uploads/
-*.db
-.env
+.web/
 .vscode/
-# logo.png removida para permitir deploy
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+database.db
+uploads/
+*.xlsx
+*.xls
+*.pdf
+logo.png
