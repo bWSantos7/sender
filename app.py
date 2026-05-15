@@ -239,8 +239,11 @@ def upload():
             emps = resultado['empreendimentos_por_corretor'].get(corretor_nome, "")
             
             # Resolver email do destinatário
-            corretor_nome_clean = corretor_nome.strip()
-            c = Corretor.query.filter(db.func.lower(Corretor.nome) == corretor_nome_clean.lower()).first()
+            corretor_nome_str = str(corretor_nome).strip()
+            if not corretor_nome_str or corretor_nome_str.lower() == 'nan':
+                continue
+                
+            c = Corretor.query.filter(db.func.lower(Corretor.nome) == corretor_nome_str.lower()).first()
             dest_email = c.email if c else None
             
             # Resolver emails dos supervisores em CC

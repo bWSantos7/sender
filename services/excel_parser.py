@@ -53,15 +53,15 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
                 
                 if tipo_envio == 'House':
                     # House: Somente Corretor
-                    df_filtered = df_raw[df_raw[col_map_raw['cargo']] == 'Corretor']
+                    df_filtered = df_raw[df_raw[col_map_raw['cargo']] == 'Corretor'].copy()
                 else: 
                     # Staff: Todos menos Corretor e Parceiro
-                    df_filtered = df_raw[~df_raw[col_map_raw['cargo']].isin(['Corretor', 'Parceiro', 'nan', 'None'])]
+                    df_filtered = df_raw[~df_raw[col_map_raw['cargo']].isin(['Corretor', 'Parceiro', 'nan', 'None'])].copy()
                 
                 # Filtro de valor
                 col_v = col_map_raw.get('valor')
                 if col_v:
-                    df_filtered[col_v] = pd.to_numeric(df_filtered[col_v], errors='coerce').fillna(0)
+                    df_filtered.loc[:, col_v] = pd.to_numeric(df_filtered[col_v], errors='coerce').fillna(0)
                     df_filtered = df_filtered[df_filtered[col_v] > 0]
                 
                 # Mapear para o formato padrão do sistema
