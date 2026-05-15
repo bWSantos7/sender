@@ -10,120 +10,37 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
         with pd.ExcelFile(caminho_arquivo) as excel_file:
             abas = excel_file.sheet_names
             
-            # 1. Lógica para House e Staff
+            # 1. House e Staff: formato direto (BENEFICIARIO, EMPREENDIMENTO, UNIDADE, VALOR)
             if tipo_envio in ['House', 'Staff']:
 
-                # --- ETAPA 1: Achar aba com coluna "Cargo" real nos dados ---
-                aba_com_cargo = None
-                aba_fechamento = None
-                aba_fallback = None
+                # Ler a primeira aba do arquivo diretamente
+                df_raw = pd.read_excel(excel_file, sheet_name=0)
 
-                for aba in abas:
-                    aba_l = aba.lower()
-                    if 'fechamento comercial' in aba_l:
-                        aba_fechamento = aba
-                    if 'comissoes_parti' in aba_l:
-                        aba_fallback = aba
-                    # Verificar se essa aba tem "Cargo" como coluna de dados real
-                    try:
-                        df_test = pd.read_excel(excel_file, sheet_name=aba, nrows=15, header=None)
-                        for i, row in df_test.iterrows():
-                            row_vals = [str(v).lower() for v in row.values]
-                            if any('cargo' in v for v in row_vals) and any('benefic' in v for v in row_vals):
-                                df_cols_check = pd.read_excel(excel_file, sheet_name=aba, skiprows=i, nrows=2)
-                                if any('cargo' in str(c).lower() for c in df_cols_check.columns):
-                                    aba_com_cargo = aba
-                                break
-                    except Exception:
-                        pass
-                    if aba_com_cargo:
-                        break
+                # Normalizar nomes de colunas (remover espaços, maiúsculas)
+                df_raw.columns = [str(c).strip().upper() for c in df_raw.columns]
 
-                # Preferência: aba com cargo > fechamento > fallback
-                aba_dados = aba_com_cargo or aba_fechamento or aba_fallback
+                # Validar colunas obrigatórias
+                colunas_esperadas = ['BENEFICIARIO', 'EMPREENDIMENTO', 'UNIDADE', 'VALOR']
+                faltando = [c for c in colunas_esperadas if c not in df_raw.columns]
+                if faltando:
+                    raise ValueError(f"Colunas ausentes na planilha: {faltando}. Esperado: {colunas_esperadas}")
 
-                if not aba_dados:
-                    raise ValueError("Nenhuma aba com dados de comissão encontrada.")
+                # Remover linhas com beneficiário vazio
+                df_raw = df_raw[~df_raw['BENEFICIARIO'].astype(str).str.strip().str.lower().isin(['nan', '', 'none'])]
 
-                # --- ETAPA 2: Encontrar linha de cabeçalho real ---
-                df_header_search = pd.read_excel(excel_file, sheet_name=aba_dados, header=None, nrows=20)
-                header_idx = 0
-                for idx, row in df_header_search.iterrows():
-                    row_str = [str(x).lower() for x in row.values]
-                    if any('benefic' in s for s in row_str):
-                        header_idx = idx
-                        break
+                # Converter VALOR para numérico e remover zeros
+                df_raw['VALOR'] = pd.to_numeric(df_raw['VALOR'], errors='coerce').fillna(0)
+                df_raw = df_raw[df_raw['VALOR'] > 0].reset_index(drop=True)
 
-                df_raw = pd.read_excel(excel_file, sheet_name=aba_dados, skiprows=header_idx)
+                if df_raw.empty:
+                    raise ValueError(f"Nenhum dado válido encontrado no arquivo para '{tipo_envio}'.")
 
-                # --- ETAPA 3: Mapeamento flexível de colunas ---
-                col_map_raw = {}
-                for c in df_raw.columns:
-                    c_l = str(c).lower()
-                    if 'benefic' in c_l and 'beneficiario' not in col_map_raw:
-                        col_map_raw['beneficiario'] = c
-                    elif 'cargo' in c_l and 'cargo' not in col_map_raw:
-                        col_map_raw['cargo'] = c
-                    elif 'empreend' in c_l and 'empreendimento' not in col_map_raw:
-                        col_map_raw['empreendimento'] = c
-                    elif ('unidade' in c_l or 'identif' in c_l) and 'unidade' not in col_map_raw:
-                        col_map_raw['unidade'] = c
-                    elif ('receber' in c_l or 'pagar' in c_l or 'comiss' in c_l) and 'valor' not in col_map_raw:
-                        col_map_raw['valor'] = c
-                    elif 'valor' in c_l and 'valor' not in col_map_raw:
-                        col_map_raw['valor'] = c
-
-                if 'beneficiario' not in col_map_raw:
-                    raise ValueError(f"Coluna 'Beneficiário' não encontrada na aba '{aba_dados}'.")
-
-                # --- ETAPA 4: Tratamento de Tabela Dinâmica (FFILL + remover Totais) ---
-                cols_to_fill = [col_map_raw['beneficiario']]
-                if 'empreendimento' in col_map_raw:
-                    cols_to_fill.append(col_map_raw['empreendimento'])
-                df_raw[cols_to_fill] = df_raw[cols_to_fill].ffill()
-
-                # Remover linhas de Total do beneficiário E do empreendimento
-                df_raw = df_raw[~df_raw[col_map_raw['beneficiario']].astype(str).str.contains('Total', case=False, na=False)]
-                if 'empreendimento' in col_map_raw:
-                    df_raw = df_raw[~df_raw[col_map_raw['empreendimento']].astype(str).str.contains('Total', case=False, na=False)]
-
-                # --- ETAPA 5: Filtro por Cargo ---
-                if 'cargo' in col_map_raw:
-                    df_raw[col_map_raw['cargo']] = df_raw[col_map_raw['cargo']].astype(str).str.strip()
-                    if tipo_envio == 'House':
-                        df_filtered = df_raw[df_raw[col_map_raw['cargo']].str.lower() == 'corretor'].copy()
-                    else:  # Staff
-                        excluir = ['corretor', 'parceiro', 'nan', 'none']
-                        df_filtered = df_raw[~df_raw[col_map_raw['cargo']].str.lower().isin(excluir)].copy()
-                else:
-                    raise ValueError(
-                        f"Coluna 'Cargo' não encontrada como coluna de dados na aba '{aba_dados}'. "
-                        f"O arquivo precisa ter 'Cargo' como coluna (não apenas filtro de Tabela Dinâmica)."
-                    )
-
-                # --- ETAPA 6: Filtro de valor ---
-                col_benef = col_map_raw['beneficiario']
-                col_emp   = col_map_raw.get('empreendimento')
-                col_uni   = col_map_raw.get('unidade')
-                col_val   = col_map_raw.get('valor')
-
-                if col_val:
-                    df_filtered.loc[:, col_val] = pd.to_numeric(df_filtered[col_val], errors='coerce').fillna(0)
-                    df_filtered = df_filtered[df_filtered[col_val] > 0]
-
-                if df_filtered.empty:
-                    raise ValueError(f"Nenhum dado para '{tipo_envio}' após filtro de Cargo e Valor.")
-
-                # --- ETAPA 7: DataFrame final ---
-                df_flat = pd.DataFrame(index=df_filtered.index)
-                df_flat['BENEFICIARIO']   = df_filtered[col_benef].astype(str).str.strip()
-                df_flat['EMPREENDIMENTO'] = df_filtered[col_emp].astype(str).str.strip() if col_emp else 'GERAL'
-                df_flat['UNIDADE']        = df_filtered[col_uni].astype(str).str.strip() if col_uni else '-'
-                df_flat['VALOR TOTAL']    = pd.to_numeric(df_filtered[col_val], errors='coerce').fillna(0) if col_val else 0
-
-                df_flat = df_flat[~df_flat['BENEFICIARIO'].str.lower().isin(['nan', '', 'none'])]
-                df_flat = df_flat[~df_flat['EMPREENDIMENTO'].str.lower().isin(['nan', '', 'none'])]
-                df_flat = df_flat[df_flat['VALOR TOTAL'] > 0].reset_index(drop=True)
+                # Montar DataFrame no formato padrão do sistema
+                df_flat = pd.DataFrame()
+                df_flat['BENEFICIARIO']   = df_raw['BENEFICIARIO'].astype(str).str.strip()
+                df_flat['EMPREENDIMENTO'] = df_raw['EMPREENDIMENTO'].astype(str).str.strip()
+                df_flat['UNIDADE']        = df_raw['UNIDADE'].astype(str).str.strip()
+                df_flat['VALOR TOTAL']    = df_raw['VALOR']
                 
                 # Obter lista única de corretores
                 corretores_nomes = [str(x).strip() for x in df_flat['BENEFICIARIO'].dropna().unique() if str(x).strip()]

@@ -91,67 +91,8 @@ def gerar_pdfs(df, tipo_envio, mes_referencia, link_form):
 
             zebra = False
 
-            # Agrupar por empreendimento para gerar o subtotal
-            for emp_nome, emp_group in group.groupby('EMPREENDIMENTO', sort=False):
-                soma_empreendimento = 0.0
-                
-                for _, row in emp_group.iterrows():
-                    if y_position < 140:
-                        c.showPage()
-                        draw_header()
-                        y_position = height - 145
-
-                        c.setFont("Helvetica-Bold", 10)
-                        c.setFillColor(MEDIUM_GREY)
-                        c.setStrokeColor(BLACK)
-                        c.setLineWidth(1)
-                        c.rect(x_start, y_position - 25, sum(col_widths), 30, fill=1, stroke=1)
-
-                        x = x_start
-                        for i, header in enumerate(headers):
-                            c.setFillColor(BLACK)
-                            c.drawCentredString(x + col_widths[i] / 2, y_position - 15, header)
-                            x += col_widths[i]
-
-                        y_position -= 30
-                        c.setFont("Helvetica", 10)
-
-                    c.setFillColor(LIGHT_GREY if zebra else WHITE)
-                    c.rect(x_start, y_position - 22, sum(col_widths), 28, fill=1, stroke=0)
-                    
-                    # Validação de tipo para formatar valor monetário
-                    try:
-                        valor = float(row['VALOR TOTAL'])
-                        soma_empreendimento += valor
-                        valor_str = f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    except:
-                        valor_str = str(row['VALOR TOTAL'])
-
-                    values = [
-                        str(row['EMPREENDIMENTO']),
-                        str(row['UNIDADE']),
-                        valor_str
-                    ]
-
-                    x = x_start
-                    for i, value in enumerate(values):
-                        c.setFillColor(BLACK)
-                        c.drawCentredString(x + col_widths[i] / 2, y_position - 14, str(value)[:40])
-                        x += col_widths[i]
-
-                    c.setStrokeColor(BLACK)
-                    c.setLineWidth(0.8)
-                    c.rect(x_start, y_position - 22, sum(col_widths), 28, fill=0)
-
-                    x_line = x_start
-                    for w in col_widths[:-1]:
-                        x_line += w
-                        c.line(x_line, y_position - 22, x_line, y_position + 6)
-
-                    y_position -= 28
-                    zebra = not zebra
-
-                # Após listar as unidades do empreendimento, adicionar a linha amarela de TOTAL
+            # Iterar linha a linha — as linhas TOTAL já vêm da planilha
+            for _, row in group.iterrows():
                 if y_position < 140:
                     c.showPage()
                     draw_header()
@@ -171,26 +112,36 @@ def gerar_pdfs(df, tipo_envio, mes_referencia, link_form):
 
                     y_position -= 30
                     c.setFont("Helvetica", 10)
-                
-                # Desenhar a linha de Total do Empreendimento
-                c.setFillColor(YELLOW)
+
+                is_total = str(row['UNIDADE']).strip().upper() == 'TOTAL'
+
+                # Fundo: amarelo para linhas TOTAL, zebra para as demais
+                if is_total:
+                    c.setFillColor(YELLOW)
+                else:
+                    c.setFillColor(LIGHT_GREY if zebra else WHITE)
+
                 c.rect(x_start, y_position - 22, sum(col_widths), 28, fill=1, stroke=0)
-                
-                total_str = f"R$ {soma_empreendimento:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                
-                values_total = [
-                    str(emp_nome).upper(),
-                    "TOTAL",
-                    total_str
+
+                try:
+                    valor = float(row['VALOR TOTAL'])
+                    valor_str = f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                except Exception:
+                    valor_str = str(row['VALOR TOTAL'])
+
+                values = [
+                    str(row['EMPREENDIMENTO']),
+                    str(row['UNIDADE']),
+                    valor_str
                 ]
-                
+
                 x = x_start
-                c.setFont("Helvetica-Bold", 10)
-                for i, value in enumerate(values_total):
+                # Negrito nas linhas TOTAL
+                c.setFont("Helvetica-Bold" if is_total else "Helvetica", 10)
+                for i, value in enumerate(values):
                     c.setFillColor(BLACK)
-                    c.drawCentredString(x + col_widths[i] / 2, y_position - 14, str(value)[:50])
+                    c.drawCentredString(x + col_widths[i] / 2, y_position - 14, str(value)[:40])
                     x += col_widths[i]
-                c.setFont("Helvetica", 10) # Volta para a fonte normal
 
                 c.setStrokeColor(BLACK)
                 c.setLineWidth(0.8)
@@ -202,6 +153,8 @@ def gerar_pdfs(df, tipo_envio, mes_referencia, link_form):
                     c.line(x_line, y_position - 22, x_line, y_position + 6)
 
                 y_position -= 28
+                if not is_total:
+                    zebra = not zebra
 
             # Botão Acessar Formulário
             if link_form:
