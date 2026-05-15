@@ -13,7 +13,6 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
             # 1. Lógica para House e Staff (Via Aba de Dados ou Fechamento Comercial)
             if tipo_envio in ['House', 'Staff']:
                 aba_dados = None
-                # Prioridade para Fechamento Comercial ou comissoes_parti
                 for aba in abas:
                     aba_l = aba.lower()
                     if 'fechamento comercial' in aba_l or 'comissoes_parti' in aba_l:
@@ -23,17 +22,18 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
                 if not aba_dados:
                     raise ValueError("Aba 'Fechamento Comercial' ou de dados brutos não encontrada.")
                 
-                # Ler a planilha pulando possíveis linhas de filtro de tabela dinâmica no topo
-                df_raw = pd.read_excel(excel_file, sheet_name=aba_dados)
+                # Ler a planilha bruta primeiro para encontrar o cabeçalho real
+                df_header_search = pd.read_excel(excel_file, sheet_name=aba_dados, header=None, nrows=20)
+                header_idx = 0
+                for idx, row in df_header_search.iterrows():
+                    row_str = [str(x).lower() for x in row.values]
+                    if any('benefic' in s for s in row_str):
+                        header_idx = idx
+                        break
                 
-                # Se as colunas não estiverem na primeira linha (comum em tabelas dinâmicas), procura a linha de cabeçalho
-                if 'Cargo' not in df_raw.columns:
-                    for i in range(1, 10):
-                        df_retry = pd.read_excel(excel_file, sheet_name=aba_dados, skiprows=i)
-                        if 'Cargo' in df_retry.columns:
-                            df_raw = df_retry
-                            break
-
+                # Ler com o cabeçalho correto
+                df_raw = pd.read_excel(excel_file, sheet_name=aba_dados, skiprows=header_idx)
+                
                 # Mapeamento flexível de colunas
                 col_map_raw = {}
                 for c in df_raw.columns:
@@ -42,34 +42,49 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
                     elif 'cargo' in c_l: col_map_raw['cargo'] = c
                     elif 'empreend' in c_l: col_map_raw['empreendimento'] = c
                     elif 'unidade' in c_l or 'identif' in c_l: col_map_raw['unidade'] = c
-                    elif 'valor' in c_l and ('pagar' in c_l or 'receber' in c_l or 'comiss' in c_l or 'total' in c_l): col_map_raw['valor'] = c
+                    elif 'valor' in c_l or 'receber' in c_l or 'pagar' in c_l: col_map_raw['valor'] = c
 
-                # Validar colunas essenciais
-                if 'cargo' not in col_map_raw or 'beneficiario' not in col_map_raw:
-                    raise ValueError(f"Colunas 'Cargo' ou 'Beneficiário' não encontradas na aba {aba_dados}.")
+                if 'beneficiario' not in col_map_raw:
+                    raise ValueError(f"Coluna 'Beneficiário' não encontrada na aba {aba_dados}.")
 
-                # Filtro de Cargo solicitado
-                df_raw[col_map_raw['cargo']] = df_raw[col_map_raw['cargo']].astype(str).str.strip()
+                # --- TRATAMENTO DE TABELA DINÂMICA ---
+                # 1. Preencher nomes para baixo (FFILL) nas colunas de agrupamento
+                cols_to_fill = [col_map_raw['beneficiario']]
+                if 'empreendimento' in col_map_raw: cols_to_fill.append(col_map_raw['empreendimento'])
+                df_raw[cols_to_fill] = df_raw[cols_to_fill].ffill()
+
+                # 2. Remover linhas de "Total"
+                df_raw = df_raw[~df_raw[col_map_raw['beneficiario']].astype(str).str.contains('Total', case=False, na=False)]
                 
-                if tipo_envio == 'House':
-                    # House: Somente Corretor
-                    df_filtered = df_raw[df_raw[col_map_raw['cargo']] == 'Corretor'].copy()
-                else: 
-                    # Staff: Todos menos Corretor e Parceiro
-                    df_filtered = df_raw[~df_raw[col_map_raw['cargo']].isin(['Corretor', 'Parceiro', 'nan', 'None'])].copy()
+                # 3. Filtro de Cargo (Se a coluna existir)
+                if 'cargo' in col_map_raw:
+                    df_raw[col_map_raw['cargo']] = df_raw[col_map_raw['cargo']].astype(str).str.strip()
+                    if tipo_envio == 'House':
+                        df_filtered = df_raw[df_raw[col_map_raw['cargo']] == 'Corretor'].copy()
+                    else: 
+                        df_filtered = df_raw[~df_raw[col_map_raw['cargo']].isin(['Corretor', 'Parceiro', 'nan', 'None'])].copy()
+                else:
+                    # Se não houver coluna de cargo, assume que o usuário já filtrou a Tabela Dinâmica
+                    df_filtered = df_raw.copy()
                 
-                # Filtro de valor
+                # 4. Filtro de valor
                 col_v = col_map_raw.get('valor')
                 if col_v:
                     df_filtered.loc[:, col_v] = pd.to_numeric(df_filtered[col_v], errors='coerce').fillna(0)
                     df_filtered = df_filtered[df_filtered[col_v] > 0]
-                
+
+                if df_filtered.empty:
+                    raise ValueError(f"Nenhum dado válido encontrado para {tipo_envio} na aba {aba_dados}.")
+
                 # Mapear para o formato padrão do sistema
                 df_flat = pd.DataFrame()
-                df_flat['BENEFICIARIO'] = df_filtered[col_map_raw['beneficiario']]
-                df_flat['EMPREENDIMENTO'] = df_filtered[col_map_raw.get('empreendimento')] if 'empreendimento' in col_map_raw else 'GERAL'
-                df_flat['UNIDADE'] = df_filtered[col_map_raw.get('unidade')] if 'unidade' in col_map_raw else '-'
+                df_flat['BENEFICIARIO'] = df_filtered[col_map_raw['beneficiario']].astype(str).str.strip()
+                df_flat['EMPREENDIMENTO'] = df_filtered[col_map_raw.get('empreendimento')].astype(str).str.strip() if 'empreendimento' in col_map_raw else 'GERAL'
+                df_flat['UNIDADE'] = df_filtered[col_map_raw.get('unidade')].astype(str).str.strip() if 'unidade' in col_map_raw else '-'
                 df_flat['VALOR TOTAL'] = df_filtered[col_map_raw.get('valor')] if 'valor' in col_map_raw else 0
+                
+                # Remover qualquer linha onde o beneficiário virou "nan" após conversão
+                df_flat = df_flat[df_flat['BENEFICIARIO'].lower() != 'nan']
                 
                 # Obter lista única de corretores
                 corretores_nomes = [str(x).strip() for x in df_flat['BENEFICIARIO'].dropna().unique() if str(x).strip()]
