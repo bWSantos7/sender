@@ -91,7 +91,7 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
                 df_flat['VALOR TOTAL'] = df_filtered[col_map_raw.get('valor')] if 'valor' in col_map_raw else 0
                 
                 # Remover qualquer linha onde o beneficiário virou "nan" após conversão
-                df_flat = df_flat[df_flat['BENEFICIARIO'].lower() != 'nan']
+                df_flat = df_flat[df_flat['BENEFICIARIO'].str.lower() != 'nan']
                 
                 # Obter lista única de corretores
                 corretores_nomes = [str(x).strip() for x in df_flat['BENEFICIARIO'].dropna().unique() if str(x).strip()]
