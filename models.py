@@ -11,7 +11,7 @@ def brasilia_now():
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(120), nullable=False)
+    password_hash = db.Column(db.Text, nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     role = db.Column(db.String(20), default='user') # 'admin' ou 'user'
     regional = db.Column(db.String(50), nullable=True) # ALTO TIETE, VALE DO PARAIBA, etc.
