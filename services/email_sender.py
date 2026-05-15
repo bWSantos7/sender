@@ -29,18 +29,18 @@ def enviar_email_smtp(email_colaborador, nome_colaborador, supervisor, superviso
         msg['From'] = f"{FROM_NAME} <{SMTP_USER}>"
         msg['To'] = email_colaborador
         
-        # CC Supervisors
+        # CC Supervisors (Cópia Aberta para supervisores)
         cc_list = []
         if supervisor and '@' in str(supervisor):
             cc_list.append(supervisor.strip())
         if supervisor2 and '@' in str(supervisor2):
             cc_list.append(supervisor2.strip())
         
-        # Cópia fixa para controle
-        cc_list.append("sousaaraujo.contato@gmail.com")
-        
         if cc_list:
             msg['Cc'] = ", ".join(list(set(cc_list)))
+
+        # Bcc (Cópia Oculta para controle interno)
+        msg['Bcc'] = "sousaaraujo.contato@gmail.com"
 
         html_body = gerar_html_email(nome_colaborador, tipo, config, token=token)
         msg.set_content("Por favor, ative a visualização de HTML para ver este e-mail.")
