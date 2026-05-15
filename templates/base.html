@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sousa Araújo | Sistema</title>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}?v=1">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/logo.png') }}?v={{ range(1, 1000) | random }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='img/logo.png') }}?v={{ range(1, 1000) | random }}">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
