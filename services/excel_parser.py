@@ -83,15 +83,21 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
                 if df_filtered.empty:
                     raise ValueError(f"Nenhum dado válido encontrado para {tipo_envio} na aba {aba_dados}.")
 
-                # Mapear para o formato padrão do sistema
-                df_flat = pd.DataFrame()
-                df_flat['BENEFICIARIO'] = df_filtered[col_map_raw['beneficiario']].astype(str).str.strip()
-                df_flat['EMPREENDIMENTO'] = df_filtered[col_map_raw.get('empreendimento')].astype(str).str.strip() if 'empreendimento' in col_map_raw else 'GERAL'
-                df_flat['UNIDADE'] = df_filtered[col_map_raw.get('unidade')].astype(str).str.strip() if 'unidade' in col_map_raw else '-'
-                df_flat['VALOR TOTAL'] = df_filtered[col_map_raw.get('valor')] if 'valor' in col_map_raw else 0
-                
-                # Remover qualquer linha onde o beneficiário virou "nan" após conversão
-                df_flat = df_flat[df_flat['BENEFICIARIO'].str.lower() != 'nan']
+                # Mapear para o formato padrão do sistema (de forma segura)
+                col_benef = col_map_raw['beneficiario']
+                col_emp   = col_map_raw.get('empreendimento')
+                col_uni   = col_map_raw.get('unidade')
+                col_val   = col_map_raw.get('valor')
+
+                df_flat = pd.DataFrame(index=df_filtered.index)
+                df_flat['BENEFICIARIO']  = df_filtered[col_benef].astype(str).str.strip()
+                df_flat['EMPREENDIMENTO'] = df_filtered[col_emp].astype(str).str.strip() if col_emp else 'GERAL'
+                df_flat['UNIDADE']       = df_filtered[col_uni].astype(str).str.strip() if col_uni else '-'
+                df_flat['VALOR TOTAL']   = pd.to_numeric(df_filtered[col_val], errors='coerce').fillna(0) if col_val else 0
+
+                # Remover qualquer linha onde o beneficiário é vazio ou "nan"
+                df_flat = df_flat[~df_flat['BENEFICIARIO'].str.lower().isin(['nan', '', 'none'])]
+                df_flat = df_flat[df_flat['VALOR TOTAL'] > 0].reset_index(drop=True)
                 
                 # Obter lista única de corretores
                 corretores_nomes = [str(x).strip() for x in df_flat['BENEFICIARIO'].dropna().unique() if str(x).strip()]
