@@ -117,6 +117,13 @@
                 <span class="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Administração</span>
             </div>
 
+            <a href="{{ url_for('upload_arquivo') }}" class="flex items-center px-2 py-2 rounded-lg group transition-colors {% if request.endpoint == 'upload_arquivo' %} bg-sa-wine text-white {% else %} text-slate-400 hover:bg-white/5 hover:text-white {% endif %}" title="Gerar Envios (Excel)">
+                <div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+                </div>
+                <span class="ml-3 font-semibold text-xs whitespace-nowrap transition-all duration-300 sidebar-text">Gerar Envios (Excel)</span>
+            </a>
+
             <a href="{{ url_for('fila') }}" class="flex items-center px-2 py-2 rounded-lg group transition-colors {% if request.endpoint == 'fila' %} bg-sa-wine text-white {% else %} text-slate-400 hover:bg-white/5 hover:text-white {% endif %}" title="Fila de Disparos">
                 <div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
                     <i data-lucide="layers" class="w-4 h-4"></i>
