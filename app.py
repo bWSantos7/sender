@@ -48,9 +48,24 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 
+def sync_postgres_sequences():
+    """Sincroniza as sequências do PostgreSQL para evitar erros de ID duplicado."""
+    if 'postgresql' in app.config['SQLALCHEMY_DATABASE_URI']:
+        try:
+            with app.app_context():
+                # Lista de tabelas para sincronizar
+                tables = ['corretor', 'configuracao', 'email_config', 'envio_log', 'fila_upload', 'empreendimento_supervisor', 'user', 'anotacao', 'link_form']
+                for table in tables:
+                    db.session.execute(db.text(f"SELECT setval('{table}_id_seq', (SELECT MAX(id) FROM {table}))"))
+                db.session.commit()
+                print("Sequências do PostgreSQL sincronizadas com sucesso.")
+        except Exception as e:
+            print(f"Erro ao sincronizar sequências: {e}")
+            db.session.rollback()
+
 # Inicialização do Banco de Dados (Executa no deploy)
 with app.app_context():
-    db.create_all()
+    sync_postgres_sequences()
     if User.query.count() == 0:
         admin_pw = os.getenv('ADMIN_PASSWORD', 'admin123')
         admin = User(
@@ -703,6 +718,9 @@ def atualizar_email():
         })
     except Exception as e:
         db.session.rollback()
+        if 'UniqueViolation' in str(e) or 'duplicate key' in str(e).lower():
+            sync_postgres_sequences()
+            return jsonify({'sucesso': False, 'erro': 'Sincronizando banco... Por favor tente novamente.'}), 500
         return jsonify({'sucesso': False, 'erro': f'Erro interno: {str(e)}'}), 500
 
 @app.route('/api/enviar_unidade', methods=['POST'])
