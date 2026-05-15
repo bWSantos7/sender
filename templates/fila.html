@@ -80,7 +80,16 @@
                         <span class="px-2 py-0.5 bg-slate-100 text-sa-muted rounded font-bold uppercase text-[9px]">{{ item.fila.tipo }}</span>
                     </td>
                     <td class="px-6 py-4 text-sa-muted truncate max-w-[200px]" title="{{ item.fila.cc_emails or '' }}">
-                        {{ item.fila.cc_emails or '-' }}
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="truncate">{{ item.fila.cc_emails or '-' }}</span>
+                            {% if item.fila.cc_emails %}
+                            <button onclick="limparCC('{{ item.fila.id }}', this)" 
+                                    class="p-1 text-sa-muted hover:text-sa-red transition-all"
+                                    title="Remover cópias">
+                                <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
+                            </button>
+                            {% endif %}
+                        </div>
                     </td>
                     <td class="px-6 py-4 text-right">
                         {% if item.fila.status == 'Pendente' %}
@@ -198,6 +207,23 @@ function enviarUnidade(id, btn) {
         btn.innerHTML = originalContent;
         btn.disabled = false;
         lucide.createIcons();
+    });
+}
+
+function limparCC(id, btn) {
+    if(!confirm('Deseja remover as cópias (CC) desta linha?')) return;
+    
+    fetch('/api/limpar_cc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    }).then(r => r.json()).then(data => {
+        if (data.sucesso) {
+            const td = btn.closest('td');
+            td.innerHTML = '<div class="flex items-center justify-between gap-2"><span class="truncate">-</span></div>';
+        } else {
+            alert('Erro ao limpar CC: ' + data.erro);
+        }
     });
 }
 </script>

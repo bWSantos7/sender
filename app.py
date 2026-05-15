@@ -723,6 +723,24 @@ def atualizar_email():
             return jsonify({'sucesso': False, 'erro': 'Sincronizando banco... Por favor tente novamente.'}), 500
         return jsonify({'sucesso': False, 'erro': f'Erro interno: {str(e)}'}), 500
 
+@app.route('/api/limpar_cc', methods=['POST'])
+@login_required
+@admin_required
+def limpar_cc():
+    try:
+        data = request.json
+        fila_id = data.get('id')
+        item = FilaUpload.query.get(fila_id)
+        if not item:
+            return jsonify({'sucesso': False, 'erro': 'Item não encontrado.'}), 404
+            
+        item.cc_emails = ""
+        db.session.commit()
+        return jsonify({'sucesso': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
 @app.route('/api/enviar_unidade', methods=['POST'])
 def enviar_unidade():
     try:
