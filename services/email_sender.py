@@ -174,6 +174,7 @@ def gerar_html_email(nome_colaborador, tipo, config, token=None):
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU VIVER ALTOS DE SÃO JOSÉ</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">58.094.959/0001-13</td></tr>
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU VIVER UP</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">58.149.372/0001-64</td></tr>
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">RESIDENCIAL SOROCABA</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">60.837.640/0001-82</td></tr>
+            <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU VIVER MILÃO</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">47.048.083/0001-52</td></tr>
           </tbody>
         </table>
         """
