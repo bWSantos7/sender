@@ -29,11 +29,16 @@
                         {{ l.status|upper }}
                     </span>
                     {% if current_user.role == 'admin' %}
-                    <form action="{{ url_for('excluir_link', id=l.id) }}" method="POST" onsubmit="return confirm('Excluir este link?')">
-                        <button type="submit" class="text-sa-muted hover:text-red-500 transition-colors">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="abrirModalEditar('{{ l.id }}', '{{ l.nome|escape }}', '{{ l.link|escape }}', '{{ l.prazo_abertura|escape }}', '{{ l.prazo_encerramento|escape }}', '{{ l.status|escape }}', '{{ l.regional|escape }}')" class="text-sa-muted hover:text-sa-wine transition-colors" title="Editar Link">
+                            <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                         </button>
-                    </form>
+                        <form action="{{ url_for('excluir_link', id=l.id) }}" method="POST" onsubmit="return confirm('Excluir este link?')" class="m-0">
+                            <button type="submit" class="text-sa-muted hover:text-red-500 transition-colors" title="Excluir Link">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </form>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -126,11 +131,69 @@
 </div>
 {% endif %}
 
+<!-- Modal Editar Link -->
+{% if current_user.role == 'admin' %}
+<div id="modal-editar-link" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div class="p-6 border-b border-sa-gray bg-sa-wine text-white">
+            <h3 class="text-lg font-bold">Editar Formulário</h3>
+            <p class="text-xs opacity-80">Atualize as informações, prazos ou status do formulário.</p>
+        </div>
+        <form id="form-editar-link" action="" method="POST" class="p-6 space-y-4">
+            <div>
+                <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Nome do Formulário</label>
+                <input type="text" name="nome" id="edit-nome" required placeholder="Ex: Adiantamento de Comissão" class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">URL do Link</label>
+                <input type="url" name="link" id="edit-link" required placeholder="https://forms.gle/..." class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Prazo Abertura</label>
+                    <input type="text" name="prazo_abertura" id="edit-prazo-abertura" placeholder="Ex: 01/05 às 08:00" class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Prazo Fechamento</label>
+                    <input type="text" name="prazo_encerramento" id="edit-prazo-encerramento" placeholder="Ex: 15/05 às 16:00" class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Status</label>
+                    <select name="status" id="edit-status" required class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+                        <option value="Ativo">Ativo</option>
+                        <option value="Inativo">Inativo</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-sa-muted uppercase mb-1">Regional</label>
+                    <select name="regional" id="edit-regional" required class="w-full bg-gray-50 border border-sa-gray rounded-lg px-4 py-2.5 text-sm outline-none focus:border-sa-wine transition-all">
+                        <option value="TODAS">TODAS AS REGIONAIS</option>
+                        <option value="ALTO TIETE">ALTO TIETE</option>
+                        <option value="VALE DO PARAIBA">VALE DO PARAIBA</option>
+                        <option value="GRANDE SÃO PAULO">GRANDE SÃO PAULO</option>
+                        <option value="GRANDE CAMPINAS">GRANDE CAMPINAS</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-3 pt-4">
+                <button type="button" onclick="document.getElementById('modal-editar-link').classList.add('hidden')" class="flex-1 px-4 py-2.5 border border-sa-gray rounded-lg text-xs font-bold text-sa-muted hover:bg-gray-50 transition-all">
+                    CANCELAR
+                </button>
+                <button type="submit" class="flex-1 bg-sa-wine text-white px-4 py-2.5 rounded-lg text-xs font-bold shadow-md hover:bg-sa-wine/90 transition-all">
+                    SALVAR ALTERAÇÕES
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
 <script>
 function copiarLink(url, btn) {
     navigator.clipboard.writeText(url).then(() => {
         const originalText = btn.querySelector('span').innerText;
-        const originalIcon = btn.querySelector('i').getAttribute('data-lucide');
         
         btn.querySelector('span').innerText = 'COPIADO!';
         btn.classList.add('bg-emerald-500', 'text-white', 'border-emerald-500');
@@ -142,6 +205,25 @@ function copiarLink(url, btn) {
             btn.querySelector('span').classList.remove('text-white');
         }, 2000);
     });
+}
+
+function abrirModalEditar(id, nome, link, prazoAbertura, prazoEncerramento, status, regional) {
+    const modal = document.getElementById('modal-editar-link');
+    const form = document.getElementById('form-editar-link');
+    
+    // Atualiza a URL de envio (action) do formulário
+    form.action = `/links/editar/${id}`;
+    
+    // Preenche os campos
+    document.getElementById('edit-nome').value = nome;
+    document.getElementById('edit-link').value = link;
+    document.getElementById('edit-prazo-abertura').value = prazoAbertura;
+    document.getElementById('edit-prazo-encerramento').value = prazoEncerramento;
+    document.getElementById('edit-status').value = status;
+    document.getElementById('edit-regional').value = regional;
+    
+    // Mostra o modal
+    modal.classList.remove('hidden');
 }
 </script>
 {% endblock %}

@@ -1333,5 +1333,28 @@ def excluir_link(id):
         flash('Link excluído.', 'success')
     return redirect(url_for('listar_links'))
 
+@app.route('/links/editar/<int:id>', methods=['POST'])
+@login_required
+@admin_required
+def editar_link(id):
+    if current_user.role != 'admin': return jsonify({'sucesso': False})
+    link = LinkForm.query.get(id)
+    if not link:
+        flash('Link não encontrado.', 'error')
+        return redirect(url_for('listar_links'))
+    
+    data = request.form
+    link.nome = data.get('nome')
+    link.link = data.get('link')
+    link.prazo_abertura = data.get('prazo_abertura')
+    link.prazo_encerramento = data.get('prazo_encerramento')
+    link.status = data.get('status', 'Ativo')
+    link.regional = data.get('regional')
+    
+    db.session.commit()
+    flash('Link atualizado com sucesso!', 'success')
+    return redirect(url_for('listar_links'))
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
