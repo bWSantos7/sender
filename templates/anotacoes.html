@@ -4,7 +4,7 @@
 
 {% block content %}
 <style>
-    /* Força largura total */
+    /* Força largura total da área de conteúdo */
     .max-w-6xl { max-width: 100% !important; margin: 0 !important; padding: 0 20px !important; }
     
     .spreadsheet-wrapper {
@@ -15,39 +15,160 @@
         overflow: hidden;
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
     }
+
+    /* Estilização Premium para as Abas Customizadas */
+    .sa-tab-btn {
+        padding: 8px 16px;
+        font-size: 0.775rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-radius: 8px;
+        border: 1.5px solid #e5e7eb;
+        background: #f9fafb;
+        color: #4b5563;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        outline: none;
+    }
+
+    .sa-tab-btn:hover {
+        background: #f3f4f6;
+        border-color: #d1d5db;
+        color: #1f2937;
+        transform: translateY(-1px);
+    }
+
+    .sa-tab-btn.active {
+        background: #720917; /* SA Wine */
+        border-color: #720917;
+        color: #ffffff;
+        box-shadow: 0 4px 10px rgba(114, 9, 23, 0.2);
+    }
+    
+    .sa-tab-btn.active:hover {
+        transform: none;
+    }
 </style>
 
-<div class="mb-4 px-4 flex justify-between items-center">
+<div class="mb-4 px-4 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
     <div>
         <h1 class="text-2xl font-black text-sa-wine tracking-tight">Anotações</h1>
         <p class="text-xs text-sa-muted font-medium mt-0.5">Planilha corporativa integrada de controle e anotações gerais.</p>
     </div>
+    
+    <!-- Barra de Abas Customizada Premium no Topo -->
+    <div class="flex flex-wrap gap-2 w-full xl:w-auto" id="custom-tabs-container">
+        <!-- Renderizado dinamicamente via JS -->
+    </div>
 </div>
 
-<div class="spreadsheet-wrapper" style="height: calc(100vh - 160px); position: relative;">
+<div class="spreadsheet-wrapper" style="height: calc(100vh - 165px); position: relative;">
     <!-- Spinner de Carregamento Premium -->
     <div id="loader" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 transition-opacity duration-500 z-10">
         <div class="w-10 h-10 border-4 border-sa-wine border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-xs text-sa-muted font-bold mt-4 tracking-wider">CARREGANDO PLANILHA CORPORATIVA...</p>
+        <p class="text-xs text-sa-muted font-bold mt-4 tracking-wider" id="loader-text">CARREGANDO A PLANILHA...</p>
     </div>
     
-    <!-- Iframe Incorporando Google Sheets (Dinâmico por Função/Role) -->
-    {% if current_user.role == 'admin' %}
-        <!-- Admins: Modo Edição Minimalista (As abas aparecem na parte inferior nativamente) -->
-        <iframe src="https://docs.google.com/spreadsheets/d/1Fr28wpAWgYJNcVqKIucGmx9QCd9-28Zy2Elu-nPrSc8/edit?rm=minimal" 
-                style="width: 100%; height: 100%; border: none;" 
-                onload="document.getElementById('loader').style.opacity = '0'; setTimeout(() => document.getElementById('loader').style.display = 'none', 500);"
-                allowfullscreen></iframe>
-    {% else %}
-        <!-- Usuários Comuns: Modo Visualização Protegida com Abas Fixas e Navegáveis no rodapé (preview?widget=true) -->
-        <iframe src="https://docs.google.com/spreadsheets/d/1Fr28wpAWgYJNcVqKIucGmx9QCd9-28Zy2Elu-nPrSc8/preview?widget=true" 
-                style="width: 100%; height: 100%; border: none;" 
-                onload="document.getElementById('loader').style.opacity = '0'; setTimeout(() => document.getElementById('loader').style.display = 'none', 500);"
-                allowfullscreen></iframe>
-    {% endif %}
+    <!-- Iframe Incorporando Google Sheets (Recarregado dinamicamente) -->
+    <iframe id="sheet-iframe" 
+            src="" 
+            style="width: 100%; height: 100%; border: none;" 
+            onload="hideLoader();"
+            allowfullscreen></iframe>
 </div>
 
 <script>
-console.log('Planilha Google Sheets carregada com seletor de abas fixado no rodapé.');
+    // Configurações do Iframe e GIDs obtidos do Google Sheets
+    const userRole = "{{ current_user.role }}";
+    const baseSheetUrl = "https://docs.google.com/spreadsheets/d/1Fr28wpAWgYJNcVqKIucGmx9QCd9-28Zy2Elu-nPrSc8";
+    
+    const sheetTabs = [
+        { id: 'house', label: 'House', gid: '615892992' },
+        { id: 'comissao', label: 'Comissão', gid: '1031660964' },
+        { id: 'adiantamento', label: 'Adiantamento', gid: '1892616393' },
+        { id: 'premio', label: 'Prêmio', gid: '974901862' },
+        { id: 'retroativo', label: 'Retroativo', gid: '1791298828' },
+        { id: 'premiacao_2025', label: 'Premiação Campeões 2025', gid: '480395091' }
+    ];
+
+    let currentActiveTab = 'house';
+
+    // Inicializa a barra de abas customizada
+    function initTabs() {
+        const container = document.getElementById('custom-tabs-container');
+        container.innerHTML = '';
+        
+        sheetTabs.forEach(tab => {
+            const btn = document.createElement('button');
+            btn.className = `sa-tab-btn ${tab.id === currentActiveTab ? 'active' : ''}`;
+            btn.innerText = tab.label;
+            btn.onclick = () => switchTab(tab.id);
+            container.appendChild(btn);
+        });
+        
+        // Carrega a aba padrão
+        loadSheetUrl(currentActiveTab);
+    }
+
+    // Alterna visualmente e carrega a aba selecionada
+    function switchTab(tabId) {
+        if (tabId === currentActiveTab) return;
+        
+        currentActiveTab = tabId;
+        
+        // Atualiza a classe ativa dos botões
+        const buttons = document.querySelectorAll('.sa-tab-btn');
+        const tabInfo = sheetTabs.find(t => t.id === tabId);
+        
+        buttons.forEach((btn, index) => {
+            if (sheetTabs[index].id === tabId) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        
+        // Exibe loader e recarrega
+        showLoader(`CARREGANDO ABA ${tabInfo.label.toUpperCase()}...`);
+        loadSheetUrl(tabId);
+    }
+
+    // Gera a URL correta com base na role e GID
+    function loadSheetUrl(tabId) {
+        const tabInfo = sheetTabs.find(t => t.id === tabId);
+        const iframe = document.getElementById('sheet-iframe');
+        
+        let finalUrl = "";
+        if (userRole === 'admin') {
+            // Admins: Edição minimalista no GID correspondente
+            finalUrl = `${baseSheetUrl}/edit?rm=minimal&gid=${tabInfo.gid}`;
+        } else {
+            // Usuários: Apenas visualização limpa (widget=false oculta abas inferiores) no GID correspondente
+            finalUrl = `${baseSheetUrl}/preview?widget=false&headers=false&gid=${tabInfo.gid}`;
+        }
+        
+        iframe.src = finalUrl;
+    }
+
+    // Funções auxiliares do Loader
+    function showLoader(message = "CARREGANDO A PLANILHA...") {
+        const loader = document.getElementById('loader');
+        const loaderText = document.getElementById('loader-text');
+        loaderText.innerText = message;
+        loader.style.display = 'flex';
+        loader.style.opacity = '1';
+    }
+
+    function hideLoader() {
+        const loader = document.getElementById('loader');
+        loader.style.opacity = '0';
+        setTimeout(() => {
+            loader.style.display = 'none';
+        }, 500);
+    }
+
+    // Inicialização ao carregar a página
+    document.addEventListener('DOMContentLoaded', initTabs);
 </script>
 {% endblock %}
