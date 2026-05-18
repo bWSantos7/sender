@@ -29,18 +29,25 @@ def enviar_email_smtp(email_colaborador, nome_colaborador, supervisor, superviso
         msg['From'] = f"{FROM_NAME} <{SMTP_USER}>"
         msg['To'] = email_colaborador
         
-        # CC Supervisors (Cópia Aberta para supervisores)
-        cc_list = []
-        if supervisor and '@' in str(supervisor):
-            cc_list.append(supervisor.strip())
-        if supervisor2 and '@' in str(supervisor2):
-            cc_list.append(supervisor2.strip())
+        # CC: No máximo 3 pessoas (1ª é sempre sousaaraujo.contato@gmail.com, as outras duas são supervisores)
+        cc_set = set()
         
-        if cc_list:
-            msg['Cc'] = ", ".join(list(set(cc_list)))
+        def adicionar_emails(campo_texto):
+            if campo_texto:
+                partes = str(campo_texto).split(',')
+                for p in partes:
+                    email_limpo = p.strip()
+                    if '@' in email_limpo:
+                        if email_limpo.lower() != 'sousaaraujo.contato@gmail.com':
+                            cc_set.add(email_limpo)
 
-        # Bcc (Cópia Oculta para controle interno)
-        msg['Bcc'] = "sousaaraujo.contato@gmail.com"
+        adicionar_emails(supervisor)
+        adicionar_emails(supervisor2)
+        
+        supervisores_ordenados = list(cc_set)
+        cc_final = ["sousaaraujo.contato@gmail.com"] + supervisores_ordenados[:2]
+        
+        msg['Cc'] = ", ".join(cc_final)
 
         html_body = gerar_html_email(nome_colaborador, tipo, config, token=token)
         msg.set_content("Por favor, ative a visualização de HTML para ver este e-mail.")

@@ -261,8 +261,8 @@ def upload():
             c = Corretor.query.filter(db.func.lower(Corretor.nome) == corretor_nome_str.lower()).first()
             dest_email = c.email if c else None
             
-            # Resolver emails dos supervisores em CC
-            cc_emails_list = []
+            # Resolver emails dos supervisores em CC (Máximo 3 no total, sendo o 1º sousaaraujo.contato@gmail.com)
+            supervisores_list = []
             if emps:
                 lista_emps = [e.strip() for e in emps.split(',')]
                 for emp in lista_emps:
@@ -279,18 +279,23 @@ def upload():
                         ).first()
 
                     if emp_sup:
-                        if emp_sup.supervisor and '@' in emp_sup.supervisor and emp_sup.supervisor not in cc_emails_list:
-                            cc_emails_list.append(emp_sup.supervisor.strip())
-                        if emp_sup.supervisor2 and '@' in emp_sup.supervisor2 and emp_sup.supervisor2 not in cc_emails_list:
-                            cc_emails_list.append(emp_sup.supervisor2.strip())
-                        
+                        if emp_sup.supervisor and '@' in emp_sup.supervisor:
+                            sup_clean = emp_sup.supervisor.strip()
+                            if sup_clean.lower() != 'sousaaraujo.contato@gmail.com' and sup_clean not in supervisores_list:
+                                supervisores_list.append(sup_clean)
+                        if emp_sup.supervisor2 and '@' in emp_sup.supervisor2:
+                            sup_clean = emp_sup.supervisor2.strip()
+                            if sup_clean.lower() != 'sousaaraujo.contato@gmail.com' and sup_clean not in supervisores_list:
+                                supervisores_list.append(sup_clean)
+
+            cc_emails_final = ["sousaaraujo.contato@gmail.com"] + supervisores_list[:2]
+            cc_emails_str = ", ".join(cc_emails_final)
+
             # Detectar Regional (Pega a regional do primeiro empreendimento da lista)
             regional_item = "OUTROS"
             if emps:
                 primeiro_emp = emps.split(',')[0].strip()
                 regional_item = get_regional_by_emp(primeiro_emp)
-
-            cc_emails_str = ", ".join(cc_emails_list) if cc_emails_list else None
             
             novo_fila = FilaUpload(
                 corretor_nome=corretor_nome,
