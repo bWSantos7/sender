@@ -138,14 +138,17 @@
     function loadSheetUrl(tabId) {
         const tabInfo = sheetTabs.find(t => t.id === tabId);
         const iframe = document.getElementById('sheet-iframe');
+        const timestamp = new Date().getTime();
         
         let finalUrl = "";
         if (userRole === 'admin') {
-            // Admins: Edição minimalista no GID correspondente
-            finalUrl = `${baseSheetUrl}/edit?rm=minimal&gid=${tabInfo.gid}`;
+            // Admins: Edição minimalista no GID correspondente (Query Parameter funcional para /edit)
+            finalUrl = `${baseSheetUrl}/edit?rm=minimal&gid=${tabInfo.gid}&t=${timestamp}`;
         } else {
-            // Usuários: Apenas visualização limpa (widget=false oculta abas inferiores) no GID correspondente
-            finalUrl = `${baseSheetUrl}/preview?widget=false&headers=false&gid=${tabInfo.gid}`;
+            // Usuários: Apenas visualização limpa (widget=false oculta abas inferiores)
+            // IMPORTANTE: No modo /preview, o GID deve ser um Hash Fragment (#gid=) para funcionar.
+            // Usamos um timestamp na query para forçar o recarregamento do iframe no navegador.
+            finalUrl = `${baseSheetUrl}/preview?widget=false&headers=false&t=${timestamp}#gid=${tabInfo.gid}`;
         }
         
         iframe.src = finalUrl;
