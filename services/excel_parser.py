@@ -74,10 +74,6 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
                 df_raw = df_raw.dropna(subset=[col_benef])
                 df_raw = df_raw[~df_raw[col_benef].astype(str).str.strip().str.lower().isin(['nan', '', 'none', 'total', 'subtotal'])]
                 
-                # Filtrar subtotal/total de unidades para evitar duplicação de valores
-                if col_uni:
-                    df_raw = df_raw[~df_raw[col_uni].astype(str).str.strip().str.upper().isin(['TOTAL', 'SUBTOTAL', 'TOTAL GERAL'])]
-                
                 # Converter valor para numérico e filtrar positivos
                 df_raw[col_val] = pd.to_numeric(df_raw[col_val], errors='coerce').fillna(0)
                 df_raw = df_raw[df_raw[col_val] > 0].reset_index(drop=True)
