@@ -530,17 +530,24 @@ def processar_fila_background():
                 continue
                 
             config = Configuracao.query.filter_by(tipo=item.tipo).first()
-            if not config:
-                config_dict = {'tipo': item.tipo}
-            else:
-                config_dict = {
-                    'tipo': config.tipo,
-                    'link_form': config.link_form,
-                    'link_form_retroativo': config.link_form_retroativo,
-                    'data_limite_envio': config.data_limite_envio,
-                    'data_pagamento': config.data_pagamento,
-                    'mes_referencia': config.mes_referencia
-                }
+            config_dict = {
+                'tipo': config.tipo if config else item.tipo,
+                'link_form': config.link_form if config else '',
+                'link_form_retroativo': config.link_form_retroativo if config else '',
+                'data_limite_envio': config.data_limite_envio if config else '',
+                'data_pagamento': config.data_pagamento if config else '',
+                'mes_referencia': config.mes_referencia if config else '',
+                'custom_message': config.custom_message if config else None,
+                'email_titulo': config.email_titulo if config else None,
+                'email_subtitulo': config.email_subtitulo if config else None,
+                'email_alerta_amarelo': config.email_alerta_amarelo if config else None,
+                'email_alerta_vermelho': config.email_alerta_vermelho if config else None,
+                'email_rodape': config.email_rodape if config else None,
+                'email_cnpjs': config.email_cnpjs if config else None,
+                'email_prazo': config.email_prazo if config else None,
+                'email_retroativo_titulo': config.email_retroativo_titulo if config else None,
+                'email_retroativo_texto': config.email_retroativo_texto if config else None
+            }
                 
             log = EnvioLog(
                 corretor_id=corretor.id,
