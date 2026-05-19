@@ -58,6 +58,18 @@
         </div>
     </div>
 
+    <!-- Filtros por Tipo de Arquivo e Busca -->
+    <div class="bg-white border border-sa-gray p-4 rounded-lg shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="flex flex-wrap gap-2 items-center" id="filter-pills-container">
+            <!-- Os botões de filtro (pills) serão gerados dinamicamente via JS -->
+        </div>
+        
+        <div class="relative w-full md:w-72">
+            <i data-lucide="search" class="w-4 h-4 text-sa-muted absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input type="text" id="search-input" placeholder="Buscar por nome do arquivo..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-sa-gray rounded text-xs outline-none focus:border-sa-wine transition-all font-medium text-sa-text">
+        </div>
+    </div>
+
     <div class="bg-white border border-sa-gray rounded shadow-sm overflow-hidden">
         <table class="w-full text-left text-xs">
             <thead class="bg-slate-50 text-sa-muted font-bold uppercase tracking-wider">
@@ -73,14 +85,14 @@
             </thead>
             <tbody class="divide-y divide-sa-gray">
                 {% for arquivo in arquivos %}
-                <tr class="hover:bg-slate-50 transition-colors">
+                <tr class="file-row hover:bg-slate-50 transition-colors" data-tipo="{{ arquivo.tipo }}">
                     <td class="px-6 py-4">
                         <input type="checkbox" class="file-checkbox w-4 h-4 rounded border-sa-gray text-sa-wine focus:ring-sa-wine transition-all" data-path="{{ arquivo.caminho }}">
                     </td>
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-3">
                             <i data-lucide="file-text" class="w-4 h-4 text-slate-400"></i>
-                            <a href="{{ url_for('visualizar_arquivo', filename=arquivo.caminho) }}" target="_blank" class="font-semibold text-sa-text hover:text-sa-wine transition-colors truncate max-w-[400px]">
+                            <a href="{{ url_for('visualizar_arquivo', filename=arquivo.caminho) }}" target="_blank" class="file-name-link font-semibold text-sa-text hover:text-sa-wine transition-colors truncate max-w-[400px]">
                                 {{ arquivo.nome }}
                             </a>
                         </div>
@@ -92,7 +104,7 @@
                     <td class="px-6 py-4 text-right text-sa-muted">{{ arquivo.data }}</td>
                 </tr>
                 {% else %}
-                <tr>
+                <tr id="empty-state-row">
                     <td colspan="5" class="px-6 py-20 text-center">
                         <i data-lucide="folder-x" class="w-10 h-10 text-sa-gray mx-auto mb-4"></i>
                         <p class="text-xs font-bold text-sa-muted uppercase tracking-widest">Nenhum arquivo encontrado</p>
@@ -105,9 +117,161 @@
 </div>
 
 <script>
-document.getElementById('select-all').addEventListener('change', function() {
-    document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = this.checked);
+let activeType = 'todos';
+let searchQuery = '';
+
+document.addEventListener('DOMContentLoaded', () => {
+    buildFilterPills();
+    filterTable();
 });
+
+function buildFilterPills() {
+    const rows = document.querySelectorAll('.file-row');
+    const counts = { 'todos': 0 };
+    
+    rows.forEach(row => {
+        const tipo = row.getAttribute('data-tipo');
+        if (tipo) {
+            counts['todos']++;
+            const normalized = tipo.trim();
+            counts[normalized] = (counts[normalized] || 0) + 1;
+        }
+    });
+
+    const container = document.getElementById('filter-pills-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Create "Todos" pill
+    const todosPill = createPill('Todos', 'todos', counts['todos']);
+    container.appendChild(todosPill);
+
+    // Create other pills sorted alphabetically
+    const sortedTypes = Object.keys(counts).filter(t => t !== 'todos').sort((a, b) => a.localeCompare(b));
+    sortedTypes.forEach(tipo => {
+        const pill = createPill(tipo, tipo, counts[tipo]);
+        container.appendChild(pill);
+    });
+}
+
+function createPill(label, value, count) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    
+    const isActive = (value.toLowerCase() === activeType.toLowerCase());
+    
+    btn.className = `filter-pill px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 ${
+        isActive 
+            ? 'bg-sa-wine text-white shadow-sm hover:bg-sa-red' 
+            : 'bg-slate-100 text-sa-muted hover:bg-slate-200 hover:text-sa-text'
+    }`;
+    btn.onclick = () => selectTypeFilter(value);
+
+    const spanLabel = document.createElement('span');
+    spanLabel.textContent = label;
+    btn.appendChild(spanLabel);
+
+    const spanCount = document.createElement('span');
+    spanCount.className = `px-1.5 py-0.5 rounded-full text-[9px] font-bold ${
+        isActive 
+            ? 'bg-white text-sa-wine' 
+            : 'bg-slate-200 text-sa-muted'
+    }`;
+    spanCount.textContent = count;
+    btn.appendChild(spanCount);
+
+    return btn;
+}
+
+function selectTypeFilter(value) {
+    activeType = value;
+    buildFilterPills();
+    filterTable();
+}
+
+function filterTable() {
+    const rows = document.querySelectorAll('.file-row');
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const rowType = row.getAttribute('data-tipo') || '';
+        const fileName = row.querySelector('.file-name-link').textContent.toLowerCase();
+        
+        const matchesType = (activeType === 'todos' || rowType.toLowerCase().trim() === activeType.toLowerCase().trim());
+        const matchesSearch = fileName.includes(searchQuery);
+        
+        if (matchesType && matchesSearch) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Check if we need to show the "no files found" row
+    const emptyState = document.getElementById('empty-state-row');
+    let noFilesRow = document.getElementById('no-files-filter-row');
+    
+    if (visibleCount === 0) {
+        // Hide base empty state if it's there
+        if (emptyState) emptyState.style.display = 'none';
+        
+        if (!noFilesRow) {
+            const tbody = document.querySelector('tbody');
+            const tr = document.createElement('tr');
+            tr.id = 'no-files-filter-row';
+            tr.innerHTML = `
+                <td colspan="5" class="px-6 py-20 text-center">
+                    <i data-lucide="folder-x" class="w-10 h-10 text-sa-gray mx-auto mb-4"></i>
+                    <p class="text-xs font-bold text-sa-muted uppercase tracking-widest">Nenhum arquivo correspondente</p>
+                </td>
+            `;
+            tbody.appendChild(tr);
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        } else {
+            noFilesRow.style.display = '';
+        }
+    } else {
+        if (noFilesRow) {
+            noFilesRow.style.display = 'none';
+        }
+        // If there are files physically, but they match search/filters, base empty state is hidden anyway
+    }
+
+    // Reset select-all state when filters change
+    document.getElementById('select-all').checked = false;
+    document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = false);
+}
+
+document.getElementById('search-input').addEventListener('input', function(e) {
+    searchQuery = e.target.value.toLowerCase().trim();
+    filterTable();
+});
+
+document.getElementById('select-all').addEventListener('change', function() {
+    document.querySelectorAll('.file-row').forEach(row => {
+        if (row.style.display !== 'none') {
+            const cb = row.querySelector('.file-checkbox');
+            if (cb) cb.checked = this.checked;
+        }
+    });
+});
+
+// Update select-all state if individual visible checkboxes are toggled
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('file-checkbox')) {
+        const visibleCheckboxes = Array.from(document.querySelectorAll('.file-row'))
+            .filter(row => row.style.display !== 'none')
+            .map(row => row.querySelector('.file-checkbox'))
+            .filter(Boolean);
+            
+        const allChecked = visibleCheckboxes.length > 0 && visibleCheckboxes.every(item => item.checked);
+        document.getElementById('select-all').checked = allChecked;
+    }
+});
+
 function baixarSelecionados() {
     const paths = Array.from(document.querySelectorAll('.file-checkbox:checked')).map(cb => cb.dataset.path);
     if (paths.length === 0) return;
