@@ -146,10 +146,20 @@ def gerar_html_email(nome_colaborador, tipo, config, token=None):
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SAFIRA II</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">22.620.409/0001-43</td></tr>
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SIENA</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">43.434.336/0001-75</td></tr>
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU PLENO HOME I</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">39.793.905/0001-00</td></tr>
+            <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU PLENO HOME II</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">39.793.905/0001-00</td></tr>
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU PLENO JACAREÍ</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">10.268.911/0001-58</td></tr>
+            <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU PLENO LIFE I</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">39.793.905/0001-00</td></tr>
+            <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU PLENO LIFE II</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">39.793.905/0001-00</td></tr>
+            <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU PLENO PAISAGE I</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">42.974.559/0001-62</td></tr>
+            <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU PLENO PAISAGE II</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">42.974.559/0001-62</td></tr>
+            <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU PLENO VISAGE</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">42.974.559/0001-62</td></tr>
+            <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU SPECIAL MOMENT</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">10.268.911/0001-58</td></tr>
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU VIVER NOVA ODESSA</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">37.886.357/0001-29</td></tr>
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU VIVER POÁ</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">32.225.532/0001-13</td></tr>
+            <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU VIVER TAUBATÉ I</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">10.268.911/0001-58</td></tr>
+            <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU VIVER TAUBATÉ II</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">10.268.911/0001-58</td></tr>
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">TANGARÁ III</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">10.268.911/0001-58</td></tr>
+            <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">SOU VIVER VICENZA</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">43.827.950/0001-05</td></tr>
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">VIDÁLIA</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">29.080.196/0001-53</td></tr>
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">BOSQUE DAS CEREJEIRAS I</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">32.197.085/0001-36</td></tr>
             <tr><td style="padding:6px 8px; border:1px solid #e5e7eb;">BOSQUE DAS CEREJEIRAS II</td><td style="padding:6px 8px; border:1px solid #e5e7eb;">32.197.085/0001-36</td></tr>
