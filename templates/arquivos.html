@@ -275,9 +275,23 @@ document.addEventListener('change', function(e) {
 function baixarSelecionados() {
     const paths = Array.from(document.querySelectorAll('.file-checkbox:checked')).map(cb => cb.dataset.path);
     if (paths.length === 0) return;
-    const params = new URLSearchParams();
-    paths.forEach(p => params.append('arquivos', p));
-    window.location.href = '/api/download_massa?' + params.toString();
+    fetch('/api/download_massa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ arquivos: paths })
+    }).then(r => {
+        if (!r.ok) { alert('Erro ao gerar o ZIP.'); return; }
+        const disp = r.headers.get('Content-Disposition') || '';
+        const match = disp.match(/filename=(.+)/);
+        const nome = match ? match[1] : 'arquivos.zip';
+        return r.blob().then(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = nome;
+            document.body.appendChild(a); a.click();
+            a.remove(); URL.revokeObjectURL(url);
+        });
+    });
 }
 function excluirSelecionados() {
     const paths = Array.from(document.querySelectorAll('.file-checkbox:checked')).map(cb => cb.dataset.path);

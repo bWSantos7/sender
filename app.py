@@ -1007,13 +1007,16 @@ def upload_manual():
             
     return jsonify({'sucesso': True, 'mensagem': f'{sucesso} arquivos enviados com sucesso.'})
 
-@app.route('/api/download_massa')
+@app.route('/api/download_massa', methods=['GET', 'POST'])
 def download_massa():
     import zipfile
     import io
     from flask import send_file
-    
-    selecionados = request.args.getlist('arquivos')
+
+    if request.method == 'POST':
+        selecionados = request.json.get('arquivos', [])
+    else:
+        selecionados = request.args.getlist('arquivos')
     if not selecionados:
         return "Nenhum arquivo selecionado", 400
         
