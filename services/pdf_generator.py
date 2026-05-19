@@ -72,7 +72,7 @@ def gerar_pdfs(df, tipo_envio, mes_referencia, link_form):
             x_start = 40
 
             headers = ["Empreendimento", "Unidade", "Valor Total"]
-            col_widths = [350, 200, 180]
+            col_widths = [250, 330, 150]
 
             c.setFont("Helvetica-Bold", 10)
             c.setFillColor(MEDIUM_GREY)
@@ -140,7 +140,7 @@ def gerar_pdfs(df, tipo_envio, mes_referencia, link_form):
                 c.setFont("Helvetica-Bold" if is_total else "Helvetica", 10)
                 for i, value in enumerate(values):
                     c.setFillColor(BLACK)
-                    c.drawCentredString(x + col_widths[i] / 2, y_position - 14, str(value)[:40])
+                    c.drawCentredString(x + col_widths[i] / 2, y_position - 14, str(value)[:60])
                     x += col_widths[i]
 
                 c.setStrokeColor(BLACK)
