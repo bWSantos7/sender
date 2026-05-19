@@ -50,6 +50,40 @@
         </div>
     </div>
 
+    <!-- Barra de filtros -->
+    <div class="bg-white border border-sa-gray rounded-lg shadow-sm p-4">
+        <div class="flex flex-wrap gap-3 items-center">
+            <div class="flex items-center gap-2 flex-1 min-w-[180px]">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-sa-muted shrink-0"></i>
+                <input id="filtro-corretor" type="text" placeholder="Buscar corretor..."
+                       oninput="aplicarFiltros()"
+                       class="text-[11px] border-b border-sa-gray focus:border-sa-wine outline-none w-full py-0.5 px-1 text-sa-text placeholder-sa-muted">
+            </div>
+            <select id="filtro-tipo" onchange="aplicarFiltros()"
+                    class="text-[11px] border border-sa-gray rounded px-2 py-1.5 text-sa-text outline-none focus:border-sa-wine bg-white">
+                <option value="">Todos os tipos</option>
+                {% set tipos = fila | map(attribute='fila.tipo') | unique | list %}
+                {% for t in tipos %}
+                <option value="{{ t }}">{{ t }}</option>
+                {% endfor %}
+            </select>
+            <select id="filtro-status" onchange="aplicarFiltros()"
+                    class="text-[11px] border border-sa-gray rounded px-2 py-1.5 text-sa-text outline-none focus:border-sa-wine bg-white">
+                <option value="">Todos os status</option>
+                <option value="Pendente">Pendente</option>
+                <option value="Processando">Enviando</option>
+                <option value="Concluido">Concluído</option>
+                <option value="Erro">Erro</option>
+            </select>
+            <button id="btn-sem-email" onclick="toggleSemEmail()"
+                    class="flex items-center gap-1.5 px-3 py-1.5 border border-sa-gray rounded text-[11px] text-sa-muted hover:border-yellow-400 hover:text-yellow-600 transition-all">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+                Sem e-mail
+            </button>
+            <span id="contador-filtro" class="text-[10px] text-sa-muted ml-auto"></span>
+        </div>
+    </div>
+
     <div class="bg-white border border-sa-gray rounded-lg shadow-sm overflow-hidden">
         <table class="w-full text-left text-[11px]">
             <thead class="bg-slate-50 text-sa-muted font-bold uppercase tracking-wider">
@@ -62,10 +96,20 @@
                     <th class="px-6 py-3 border-b border-sa-gray text-right">Ações</th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-sa-gray">
+            <tbody id="tabela-fila" class="divide-y divide-sa-gray">
                 {% for item in fila %}
-                <tr class="hover:bg-slate-50 transition-colors">
-                    <td class="px-6 py-4 font-semibold text-sa-text">{{ item.fila.corretor_nome }}</td>
+                <tr class="transition-colors {% if not item.fila.destinatario_email %}bg-yellow-50 hover:bg-yellow-100{% else %}hover:bg-slate-50{% endif %}"
+                    data-corretor="{{ item.fila.corretor_nome | lower }}"
+                    data-tipo="{{ item.fila.tipo }}"
+                    data-status="{{ item.fila.status }}"
+                    data-sem-email="{{ 'true' if not item.fila.destinatario_email else 'false' }}">
+                    <td class="px-6 py-4 font-semibold {% if not item.fila.destinatario_email %}text-yellow-700{% else %}text-sa-text{% endif %}">
+                        {% if not item.fila.destinatario_email %}
+                        <span class="inline-flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3 h-3 text-yellow-500"></i>{{ item.fila.corretor_nome }}</span>
+                        {% else %}
+                        {{ item.fila.corretor_nome }}
+                        {% endif %}
+                    </td>
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-2 group">
                             <input type="email" 
@@ -209,6 +253,43 @@ function enviarUnidade(id, btn) {
         lucide.createIcons();
     });
 }
+
+let filtroSemEmail = false;
+function toggleSemEmail() {
+    filtroSemEmail = !filtroSemEmail;
+    const btn = document.getElementById('btn-sem-email');
+    if (filtroSemEmail) {
+        btn.classList.add('bg-yellow-50', 'border-yellow-400', 'text-yellow-600');
+        btn.classList.remove('text-sa-muted');
+    } else {
+        btn.classList.remove('bg-yellow-50', 'border-yellow-400', 'text-yellow-600');
+        btn.classList.add('text-sa-muted');
+    }
+    aplicarFiltros();
+}
+
+function aplicarFiltros() {
+    const termCorretor = document.getElementById('filtro-corretor').value.toLowerCase().trim();
+    const termTipo = document.getElementById('filtro-tipo').value;
+    const termStatus = document.getElementById('filtro-status').value;
+    const rows = document.querySelectorAll('#tabela-fila tr');
+    let visiveis = 0;
+    rows.forEach(row => {
+        const corretor = row.dataset.corretor || '';
+        const tipo = row.dataset.tipo || '';
+        const status = row.dataset.status || '';
+        const semEmail = row.dataset.semEmail === 'true';
+        const ok = (!termCorretor || corretor.includes(termCorretor))
+                && (!termTipo    || tipo === termTipo)
+                && (!termStatus  || status === termStatus)
+                && (!filtroSemEmail || semEmail);
+        row.style.display = ok ? '' : 'none';
+        if (ok) visiveis++;
+    });
+    const contador = document.getElementById('contador-filtro');
+    contador.textContent = visiveis < rows.length ? `${visiveis} de ${rows.length} exibidos` : `${rows.length} itens`;
+}
+aplicarFiltros();
 
 function limparCC(id, btn) {
     if(!confirm('Deseja remover as cópias (CC) desta linha?')) return;
