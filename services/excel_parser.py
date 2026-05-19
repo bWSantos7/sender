@@ -69,14 +69,17 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
             # Se for detectada como Tabela Plana (Flat Table), processamos de forma direta e otimizada!
             if is_flat:
                 df_raw = pd.read_excel(excel_file, sheet_name=aba_selecionada)
-                
+
                 # Remover beneficiário nulo
                 df_raw = df_raw.dropna(subset=[col_benef])
                 df_raw = df_raw[~df_raw[col_benef].astype(str).str.strip().str.lower().isin(['nan', '', 'none', 'total', 'subtotal'])]
-                
+
                 # Converter valor para numérico e filtrar positivos
                 df_raw[col_val] = pd.to_numeric(df_raw[col_val], errors='coerce').fillna(0)
+                todos_nomes = set(df_raw[col_benef].astype(str).str.strip().unique())
                 df_raw = df_raw[df_raw[col_val] > 0].reset_index(drop=True)
+                nomes_validos = set(df_raw[col_benef].astype(str).str.strip().unique())
+                ignorados_valor_zero = sorted(todos_nomes - nomes_validos)
 
                 if df_raw.empty:
                     raise ValueError(f"Nenhum dado de valor positivo encontrado na aba plana '{aba_selecionada}'.")
@@ -86,7 +89,7 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
                 df_flat['EMPREENDIMENTO'] = df_raw[col_emp].astype(str).str.strip() if col_emp else 'GERAL'
                 df_flat['UNIDADE']        = df_raw[col_uni].astype(str).str.strip() if col_uni else '-'
                 df_flat['VALOR TOTAL']    = df_raw[col_val]
-                
+
                 corretores_nomes = [str(x).strip() for x in df_flat['BENEFICIARIO'].dropna().unique() if str(x).strip()]
                 
                 empreendimentos_por_corretor = {}
@@ -99,7 +102,8 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
                     'dataframe': df_flat,
                     'corretores': corretores_nomes,
                     'empreendimentos_por_corretor': empreendimentos_por_corretor,
-                    'aba_lida': aba_selecionada
+                    'aba_lida': aba_selecionada,
+                    'ignorados': ignorados_valor_zero
                 }
                 
             # Extrair Imobiliárias e Empreendimentos das outras abas para mapeamento (Dicionário global)
@@ -218,9 +222,10 @@ def processar_planilha_base(caminho_arquivo, tipo_envio):
                 'dataframe': df_flat,
                 'corretores': corretores_nomes,
                 'empreendimentos_por_corretor': empreendimentos_por_corretor,
-                'aba_lida': aba_selecionada
+                'aba_lida': aba_selecionada,
+                'ignorados': []
             }
-        
+
     except Exception as e:
         return {
             'sucesso': False,

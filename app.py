@@ -322,6 +322,10 @@ def upload():
                 except:
                     break
             
+        ignorados = resultado.get('ignorados', [])
+        if ignorados:
+            flash(f"Atenção: {len(ignorados)} nome(s) foram ignorados por terem valor R$ 0 ou inválido na planilha: {', '.join(ignorados)}", 'warning')
+
         flash(f"Planilha processada com sucesso! {len(resultado_pdf['pdfs'])} PDFs gerados. Verifique a fila de envio.", 'success')
         return redirect(url_for('fila'))
 
