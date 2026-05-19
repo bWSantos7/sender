@@ -1,16 +1,19 @@
 import threading
 import time
 import random
-from datetime import datetime, timedelta
+import re
 import os
 import io
 import zipfile
 import json
+from datetime import datetime, timedelta
+
 import pandas as pd
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user, UserMixin
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 
 def admin_required(f):
     @wraps(f)
@@ -134,12 +137,49 @@ MAPA_REGIONAIS = {
 }
 
 def get_regional_by_emp(emp_name):
-    if not emp_name: return "OUTROS"
+    if not emp_name:
+        return "OUTROS"
     emp_upper = emp_name.upper().strip()
+    if emp_upper in MAPA_REGIONAIS:
+        return MAPA_REGIONAIS[emp_upper]
     for key, regional in MAPA_REGIONAIS.items():
         if key in emp_upper:
             return regional
     return "OUTROS"
+
+
+def _config_to_dict(config, fallback_tipo=''):
+    """Converte um objeto Configuracao em dict para geração de e-mail/PDF."""
+    if config:
+        return {
+            'tipo': config.tipo,
+            'link_form': config.link_form or '',
+            'link_form_retroativo': config.link_form_retroativo or '',
+            'data_limite_envio': config.data_limite_envio or '',
+            'data_pagamento': config.data_pagamento or '',
+            'mes_referencia': config.mes_referencia or '',
+            'custom_message': config.custom_message,
+            'email_titulo': config.email_titulo,
+            'email_subtitulo': config.email_subtitulo,
+            'email_alerta_amarelo': config.email_alerta_amarelo,
+            'email_alerta_vermelho': config.email_alerta_vermelho,
+            'email_rodape': config.email_rodape,
+            'email_cnpjs': config.email_cnpjs,
+            'email_prazo': config.email_prazo,
+            'email_retroativo_titulo': config.email_retroativo_titulo,
+            'email_retroativo_texto': config.email_retroativo_texto,
+        }
+    return {
+        'tipo': fallback_tipo, 'link_form': '', 'link_form_retroativo': '',
+        'data_limite_envio': '', 'data_pagamento': '', 'mes_referencia': '',
+        'custom_message': None, 'email_titulo': None, 'email_subtitulo': None,
+        'email_alerta_amarelo': None, 'email_alerta_vermelho': None,
+        'email_rodape': None, 'email_cnpjs': None, 'email_prazo': None,
+        'email_retroativo_titulo': None, 'email_retroativo_texto': None,
+    }
+
+
+_thread_lock = threading.Lock()
 
 # Configuração do Login
 login_manager = LoginManager()
@@ -312,14 +352,13 @@ def upload():
         
         # Apagar temp
         if os.path.exists(caminho_temporario):
-            import time
-            for _ in range(5): # Tenta 5 vezes
+            for _ in range(5):
                 try:
                     os.remove(caminho_temporario)
                     break
                 except PermissionError:
-                    time.sleep(0.5)
-                except:
+                    time.sleep(0.3)
+                except Exception:
                     break
             
         ignorados = resultado.get('ignorados', [])
@@ -485,6 +524,8 @@ def importar_supervisores():
     return redirect(url_for('configuracoes'))
 
 @app.route('/zerar_supervisores', methods=['POST'])
+@login_required
+@admin_required
 def zerar_supervisores():
     try:
         query_del = EmpreendimentoSupervisor.query
@@ -520,8 +561,6 @@ def processar_fila_background():
             corretor = Corretor.query.filter(db.func.lower(Corretor.nome) == item.corretor_nome.lower().strip()).first()
             if not corretor:
                 item.status = 'Erro'
-                log = EnvioLog(corretor_id=1, tipo=item.tipo, status='Erro', mensagem_erro='Corretor não encontrado no banco', caminho_anexo=item.caminho_pdf, regional=item.regional)
-                db.session.add(log)
                 db.session.commit()
                 continue
                 
@@ -534,25 +573,8 @@ def processar_fila_background():
                 continue
                 
             config = Configuracao.query.filter_by(tipo=item.tipo).first()
-            config_dict = {
-                'tipo': config.tipo if config else item.tipo,
-                'link_form': config.link_form if config else '',
-                'link_form_retroativo': config.link_form_retroativo if config else '',
-                'data_limite_envio': config.data_limite_envio if config else '',
-                'data_pagamento': config.data_pagamento if config else '',
-                'mes_referencia': config.mes_referencia if config else '',
-                'custom_message': config.custom_message if config else None,
-                'email_titulo': config.email_titulo if config else None,
-                'email_subtitulo': config.email_subtitulo if config else None,
-                'email_alerta_amarelo': config.email_alerta_amarelo if config else None,
-                'email_alerta_vermelho': config.email_alerta_vermelho if config else None,
-                'email_rodape': config.email_rodape if config else None,
-                'email_cnpjs': config.email_cnpjs if config else None,
-                'email_prazo': config.email_prazo if config else None,
-                'email_retroativo_titulo': config.email_retroativo_titulo if config else None,
-                'email_retroativo_texto': config.email_retroativo_texto if config else None
-            }
-                
+            config_dict = _config_to_dict(config, item.tipo)
+
             log = EnvioLog(
                 corretor_id=corretor.id,
                 tipo=item.tipo,
@@ -592,6 +614,7 @@ def processar_fila_background():
     thread_ativa = False
 
 @app.route('/api/status_envio')
+@login_required
 def status_envio():
     query_log = EnvioLog.query
     query_fila = FilaUpload.query
@@ -635,6 +658,7 @@ def status_envio():
     })
 
 @app.route('/limpar_logs', methods=['POST'])
+@login_required
 def limpar_logs():
     try:
         query_del = EnvioLog.query
@@ -658,11 +682,11 @@ def parar_envios():
 @admin_required
 def iniciar_envios():
     global thread_ativa
-    if thread_ativa:
-        return jsonify({'sucesso': False, 'erro': 'Já existe um envio em andamento.'}), 400
-        
-    thread = threading.Thread(target=processar_fila_background)
-    thread.start()
+    with _thread_lock:
+        if thread_ativa:
+            return jsonify({'sucesso': False, 'erro': 'Já existe um envio em andamento.'}), 400
+        thread = threading.Thread(target=processar_fila_background, daemon=True)
+        thread.start()
     
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
         return jsonify({'sucesso': True, 'mensagem': 'Disparos iniciados!'})
@@ -700,8 +724,7 @@ def atualizar_email():
         
         if not nome or not email:
             return jsonify({'sucesso': False, 'erro': 'Nome e E-mail são obrigatórios.'}), 400
-            
-        import re
+
         if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
             return jsonify({'sucesso': False, 'erro': 'Formato de e-mail inválido.'}), 400
             
@@ -758,6 +781,7 @@ def limpar_cc():
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 @app.route('/api/enviar_unidade', methods=['POST'])
+@login_required
 def enviar_unidade():
     try:
         data = request.json
@@ -779,24 +803,7 @@ def enviar_unidade():
         db.session.commit()
         
         config = Configuracao.query.filter_by(tipo=item.tipo).first()
-        config_dict = {
-            'tipo': config.tipo if config else item.tipo,
-            'link_form': config.link_form if config else '',
-            'link_form_retroativo': config.link_form_retroativo if config else '',
-            'data_limite_envio': config.data_limite_envio if config else '',
-            'data_pagamento': config.data_pagamento if config else '',
-            'mes_referencia': config.mes_referencia if config else '',
-            'custom_message': config.custom_message if config else None,
-            'email_titulo': config.email_titulo if config else None,
-            'email_subtitulo': config.email_subtitulo if config else None,
-            'email_alerta_amarelo': config.email_alerta_amarelo if config else None,
-            'email_alerta_vermelho': config.email_alerta_vermelho if config else None,
-            'email_rodape': config.email_rodape if config else None,
-            'email_cnpjs': config.email_cnpjs if config else None,
-            'email_prazo': config.email_prazo if config else None,
-            'email_retroativo_titulo': config.email_retroativo_titulo if config else None,
-            'email_retroativo_texto': config.email_retroativo_texto if config else None
-        }
+        config_dict = _config_to_dict(config, item.tipo)
 
         log = EnvioLog(
             corretor_id=corretor.id,
@@ -936,6 +943,7 @@ def colaboradores():
     return render_template('colaboradores.html', corretores=corretores, empreendimentos=empreendimentos)
 
 @app.route('/arquivos')
+@login_required
 def arquivos():
     base_uploads = os.path.join(app.root_path, 'uploads')
     lista_arquivos = []
@@ -961,6 +969,8 @@ def arquivos():
 
 
 @app.route('/api/excluir_arquivos', methods=['POST'])
+@login_required
+@admin_required
 def excluir_arquivos():
     data = request.json
     selecionados = data.get('arquivos', [])
@@ -980,38 +990,41 @@ def excluir_arquivos():
     return jsonify({'sucesso': True, 'mensagem': f'{sucesso} arquivos excluídos, {erros} erros.'})
 
 @app.route('/api/visualizar_arquivo/<path:filename>')
+@login_required
 def visualizar_arquivo(filename):
-    from flask import send_file
-    base_uploads = os.path.join(app.root_path, 'uploads')
-    caminho = os.path.join(base_uploads, filename)
+    base_uploads = os.path.realpath(os.path.join(app.root_path, 'uploads'))
+    caminho = os.path.realpath(os.path.join(base_uploads, filename))
+    if not caminho.startswith(base_uploads + os.sep) and caminho != base_uploads:
+        return "Acesso negado.", 403
     if os.path.exists(caminho):
         return send_file(caminho)
-    return "Arquivo não encontrado", 404
+    return "Arquivo não encontrado.", 404
 
 @app.route('/api/upload_manual', methods=['POST'])
+@login_required
+@admin_required
 def upload_manual():
-    tipo = request.form.get('tipo', 'Outros').lower()
+    tipo = re.sub(r'[^a-z0-9_-]', '', request.form.get('tipo', 'outros').lower())
     files = request.files.getlist('files')
-    
+
     if not files or files[0].filename == '':
         return jsonify({'sucesso': False, 'erro': 'Nenhum arquivo selecionado.'}), 400
-        
+
     base_uploads = os.path.join(app.root_path, 'uploads', tipo)
     os.makedirs(base_uploads, exist_ok=True)
-    
+
     sucesso = 0
     for file in files:
         if file.filename:
-            file.save(os.path.join(base_uploads, file.filename))
+            nome_seguro = secure_filename(file.filename)
+            file.save(os.path.join(base_uploads, nome_seguro))
             sucesso += 1
-            
-    return jsonify({'sucesso': True, 'mensagem': f'{sucesso} arquivos enviados com sucesso.'})
+
+    return jsonify({'sucesso': True, 'mensagem': f'{sucesso} arquivo(s) enviado(s) com sucesso.'})
 
 @app.route('/api/download_massa', methods=['GET', 'POST'])
+@login_required
 def download_massa():
-    import zipfile
-    import io
-    from flask import send_file
 
     if request.method == 'POST':
         selecionados = request.json.get('arquivos', [])
@@ -1041,6 +1054,7 @@ def download_massa():
                      download_name=f'arquivos_comissao_{datetime.now().strftime("%d%m%Y_%H%M")}.zip')
 
 @app.route('/api/editar_corretor', methods=['POST'])
+@login_required
 def editar_corretor():
     data = request.json
     corretor_id = data.get('id')
@@ -1072,6 +1086,7 @@ def editar_corretor():
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 @app.route('/api/editar_empreendimento', methods=['POST'])
+@login_required
 def editar_empreendimento():
     data = request.json
     emp_id = data.get('id')
@@ -1104,6 +1119,8 @@ def editar_empreendimento():
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
 
 @app.route('/api/salvar_template', methods=['POST'])
+@login_required
+@admin_required
 def salvar_template():
     try:
         data = request.json
@@ -1138,27 +1155,7 @@ def view_email(token):
         
     corretor_nome = log.corretor.nome if log.corretor else "Colaborador"
     config = Configuracao.query.filter_by(tipo=log.tipo).first()
-    
-    # Simular config dict para o gerador
-    config_dict = {
-        'tipo': log.tipo,
-        'link_form': config.link_form if config else '#',
-        'link_form_retroativo': config.link_form_retroativo if config else '#',
-        'data_limite_envio': config.data_limite_envio if config else '',
-        'data_pagamento': config.data_pagamento if config else '',
-        'mes_referencia': config.mes_referencia if config else '',
-        'custom_message': config.custom_message if config else None,
-        'email_titulo': config.email_titulo if config else None,
-        'email_subtitulo': config.email_subtitulo if config else None,
-        'email_alerta_amarelo': config.email_alerta_amarelo if config else None,
-        'email_alerta_vermelho': config.email_alerta_vermelho if config else None,
-        'email_rodape': config.email_rodape if config else None,
-        'email_cnpjs': config.email_cnpjs if config else None,
-        'email_prazo': config.email_prazo if config else None,
-        'email_retroativo_titulo': config.email_retroativo_titulo if config else None,
-        'email_retroativo_texto': config.email_retroativo_texto if config else None
-    }
-    
+    config_dict = _config_to_dict(config, log.tipo)
     email_html = gerar_html_email(corretor_nome, log.tipo, config_dict)
     return email_html
 
@@ -1238,26 +1235,7 @@ def excluir_anotacao(id):
 def preview_email():
     tipo = request.args.get('tipo', 'Adiantamento')
     conf = Configuracao.query.filter_by(tipo=tipo).first()
-    
-    config_dict = {
-        'tipo': tipo,
-        'link_form': conf.link_form if conf else '#',
-        'link_form_retroativo': conf.link_form_retroativo if conf else '#',
-        'data_limite_envio': conf.data_limite_envio if conf else '15/05 às 15:59',
-        'data_pagamento': conf.data_pagamento if conf else '25 e 30',
-        'mes_referencia': conf.mes_referencia if conf else 'Maio 2026',
-        'custom_message': conf.custom_message if conf else None,
-        'email_titulo': conf.email_titulo if conf else None,
-        'email_subtitulo': conf.email_subtitulo if conf else None,
-        'email_alerta_amarelo': conf.email_alerta_amarelo if conf else None,
-        'email_alerta_vermelho': conf.email_alerta_vermelho if conf else None,
-        'email_rodape': conf.email_rodape if conf else None,
-        'email_cnpjs': conf.email_cnpjs if conf else None,
-        'email_prazo': conf.email_prazo if conf else None,
-        'email_retroativo_titulo': conf.email_retroativo_titulo if conf else None,
-        'email_retroativo_texto': conf.email_retroativo_texto if conf else None
-    }
-    
+    config_dict = _config_to_dict(conf, tipo)
     email_html = gerar_html_email("Nome do Corretor Teste", tipo, config_dict)
     return render_template('preview_editor.html', email_html=email_html, tipo=tipo)
 

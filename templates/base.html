@@ -39,35 +39,24 @@
     
     <style>
         .sidebar-transition { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        
-        .dropdown-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out;
-        }
-        .dropdown-active .dropdown-content {
-            max-height: 200px;
-        }
-        .dropdown-arrow {
-            transition: transform 0.3s ease;
-        }
-        .dropdown-active .dropdown-arrow {
-            transform: rotate(180deg);
-        }
-
         #sidebar.sidebar-collapsed { width: 72px; }
         #sidebar.sidebar-collapsed .logo-container { display: none; }
         #sidebar.sidebar-collapsed .sidebar-header { justify-content: center; padding: 0; }
-        
-        #sidebar.sidebar-collapsed .sidebar-text {
-            width: 0;
-            opacity: 0;
-            margin-left: 0;
-            overflow: hidden;
-        }
-        #sidebar.sidebar-collapsed .nav-arrow { display: none; }
-        #sidebar.sidebar-collapsed .admin-label { display: none; }
+        #sidebar.sidebar-collapsed .sidebar-text { width:0; opacity:0; margin-left:0; overflow:hidden; }
+        #sidebar.sidebar-collapsed .nav-arrow,
+        #sidebar.sidebar-collapsed .admin-label,
         #sidebar.sidebar-collapsed .dropdown-content { display: none; }
+
+        /* Toasts */
+        #toast-container { position:fixed; top:1rem; right:1rem; z-index:9999; display:flex; flex-direction:column; gap:.5rem; pointer-events:none; }
+        .toast { display:flex; align-items:flex-start; gap:.75rem; padding:.75rem 1rem; border-radius:.5rem; font-size:.75rem; font-weight:600; max-width:24rem; box-shadow:0 4px 12px rgba(0,0,0,.12); pointer-events:all; animation: toast-in .25s ease; }
+        @keyframes toast-in { from{opacity:0;transform:translateX(1.5rem)} to{opacity:1;transform:none} }
+        .toast-success { background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; }
+        .toast-error   { background:#fef2f2; color:#991b1b; border:1px solid #fecaca; }
+        .toast-warning { background:#fffbeb; color:#92400e; border:1px solid #fde68a; }
+        .toast-info    { background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; }
+        .toast-close   { margin-left:auto; cursor:pointer; opacity:.5; flex-shrink:0; line-height:1; font-size:1rem; }
+        .toast-close:hover { opacity:1; }
     </style>
 </head>
 <body class="h-full font-sans text-sa-text antialiased flex overflow-hidden">
@@ -186,47 +175,56 @@
 
         <main class="flex-1 overflow-y-auto p-8">
             <div class="max-w-6xl mx-auto space-y-6">
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        <div class="space-y-2">
-                            {% for category, message in messages %}
-                                <div class="p-3 text-xs font-bold rounded border {% if category == 'error' %} bg-red-50 text-red-700 border-red-100 {% else %} bg-emerald-50 text-emerald-700 border-emerald-100 {% endif %}">
-                                    {{ message }}
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-                {% endwith %}
-
                 {% block content %}{% endblock %}
             </div>
         </main>
     </div>
 
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
+    <!-- Flash messages como data attributes (evita Jinja2 dentro de script) -->
+    <div id="flash-data" class="hidden"
+         data-messages="{{ get_flashed_messages(with_categories=true) | tojson | e }}">
+    </div>
+
     <script>
         lucide.createIcons();
-        
-        function toggleDropdown(btn) {
-            const sidebar = document.getElementById('sidebar');
-            if (sidebar.classList.contains('sidebar-collapsed')) {
-                toggleSidebar();
-            }
-            const group = btn.closest('.dropdown-group');
-            group.classList.toggle('dropdown-active');
-        }
 
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             sidebar.classList.toggle('sidebar-collapsed');
-            
-            // Salvar estado no localStorage
             localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('sidebar-collapsed'));
         }
-
-        // Recuperar estado inicial
         if (localStorage.getItem('sidebarCollapsed') === 'true') {
             document.getElementById('sidebar').classList.add('sidebar-collapsed');
         }
+
+        const TOAST_ICONS = { success: 'check-circle', error: 'x-circle', warning: 'alert-triangle', info: 'info' };
+
+        function showToast(msg, cat) {
+            cat = cat || 'info';
+            const validCats = ['success', 'error', 'warning', 'info'];
+            if (!validCats.includes(cat)) cat = 'info';
+            const container = document.getElementById('toast-container');
+            const el = document.createElement('div');
+            el.className = 'toast toast-' + cat;
+            el.innerHTML = '<i data-lucide="' + (TOAST_ICONS[cat] || 'info') + '" style="width:1rem;height:1rem;flex-shrink:0"></i>'
+                         + '<span style="flex:1">' + msg + '</span>'
+                         + '<span class="toast-close" onclick="this.closest(\'.toast\').remove()">&times;</span>';
+            container.appendChild(el);
+            lucide.createIcons({ nodes: [el] });
+            setTimeout(function() { el.style.opacity = '0'; el.style.transition = 'opacity .4s'; setTimeout(function() { el.remove(); }, 400); }, 5000);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const raw = document.getElementById('flash-data');
+            if (!raw) return;
+            try {
+                const msgs = JSON.parse(raw.dataset.messages || '[]');
+                msgs.forEach(function(m) { showToast(m[1], m[0]); });
+            } catch(e) {}
+        });
     </script>
 </body>
 </html>

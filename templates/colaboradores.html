@@ -6,74 +6,120 @@
 <div class="space-y-6">
     <div class="flex flex-col md:flex-row justify-between items-center gap-4">
         <div class="flex bg-sa-gray p-0.5 rounded">
-            <button onclick="switchTab('corretores')" id="tab-corretores" class="px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all bg-white shadow-sm text-sa-text">Corretores</button>
-            <button onclick="switchTab('supervisores')" id="tab-supervisores" class="px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all text-sa-muted hover:text-sa-text">CC / Supervisores</button>
+            <button onclick="switchTab('corretores')" id="tab-corretores"
+                    class="px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all bg-white shadow-sm text-sa-text">
+                Corretores <span id="badge-corretores" class="ml-1 px-1.5 py-0.5 bg-sa-gray rounded text-[9px] text-sa-muted">{{ corretores|length }}</span>
+            </button>
+            <button onclick="switchTab('supervisores')" id="tab-supervisores"
+                    class="px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all text-sa-muted hover:text-sa-text">
+                CC / Supervisores <span id="badge-supervisores" class="ml-1 px-1.5 py-0.5 bg-sa-gray rounded text-[9px] text-sa-muted">{{ empreendimentos|length }}</span>
+            </button>
         </div>
         <div class="flex items-center gap-3 w-full md:w-auto">
             <div class="relative flex-1 md:w-72">
-                <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-sa-muted"></i>
-                <input type="text" id="search-input" onkeyup="filterUnified()" placeholder="BUSCAR..." class="w-full pl-9 pr-4 py-2 bg-white border border-sa-gray rounded text-xs font-bold focus:border-sa-wine transition-all">
+                <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-sa-muted pointer-events-none"></i>
+                <input type="text" id="search-input" oninput="filterUnified()" placeholder="Buscar por nome ou e-mail..."
+                       class="w-full pl-9 pr-4 py-2 bg-white border border-sa-gray rounded text-[11px] focus:border-sa-wine transition-all outline-none">
             </div>
-            <button onclick="abrirNovo()" class="px-4 py-2 bg-sa-dark text-white rounded text-[10px] font-bold uppercase tracking-widest hover:bg-sa-wine transition-all flex items-center gap-2">
-                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                ADICIONAR
+            <span id="search-count" class="text-[10px] text-sa-muted whitespace-nowrap"></span>
+            {% if current_user.role == 'admin' %}
+            <button onclick="abrirNovo()"
+                    class="px-4 py-2 bg-sa-dark text-white rounded text-[10px] font-bold uppercase tracking-widest hover:bg-sa-wine transition-all flex items-center gap-2 whitespace-nowrap">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Adicionar
             </button>
+            {% endif %}
         </div>
     </div>
 
-    <!-- Tables -->
+    <!-- Corretores -->
     <div id="section-corretores" class="bg-white border border-sa-gray rounded shadow-sm overflow-hidden">
-        <table id="table-corretores" class="w-full text-left text-xs">
-            <thead class="bg-slate-50 text-sa-muted font-bold uppercase tracking-wider">
+        <table class="w-full text-left text-[11px]">
+            <thead class="bg-slate-50 text-sa-muted font-bold uppercase tracking-wider text-[10px]">
                 <tr>
-                    <th class="px-6 py-3 border-b border-sa-gray">ID</th>
                     <th class="px-6 py-3 border-b border-sa-gray">Nome</th>
                     <th class="px-6 py-3 border-b border-sa-gray">E-mail</th>
-                    <th class="px-6 py-3 border-b border-sa-gray text-right">Ação</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">Regional</th>
+                    {% if current_user.role == 'admin' %}
+                    <th class="px-6 py-3 border-b border-sa-gray text-right">Ações</th>
+                    {% endif %}
                 </tr>
             </thead>
-            <tbody class="divide-y divide-sa-gray">
+            <tbody id="tbody-corretores" class="divide-y divide-sa-gray">
                 {% for c in corretores %}
-                <tr class="hover:bg-slate-50 transition-colors">
-                    <td class="px-6 py-4 text-sa-muted font-mono">#{{ c.id }}</td>
-                    <td class="px-6 py-4 font-bold text-sa-text uppercase tracking-tight">{{ c.nome }}</td>
-                    <td class="px-6 py-4 text-sa-muted">{{ c.email or 'N/A' }}</td>
-                    <td class="px-6 py-4 text-right">
-                        <button onclick="abrirModalEdicao({{ c.id }}, '{{ c.nome }}', '{{ c.email }}')" class="text-sa-wine hover:underline font-bold uppercase text-[10px]">Editar</button>
+                <tr class="hover:bg-slate-50 transition-colors row-corretor"
+                    data-nome="{{ c.nome | lower }}"
+                    data-email="{{ (c.email or '') | lower }}">
+                    <td class="px-6 py-3 font-semibold text-sa-text">{{ c.nome }}</td>
+                    <td class="px-6 py-3 text-sa-muted {% if not c.email %}text-sa-red font-semibold{% endif %}">
+                        {{ c.email or '— sem e-mail —' }}
                     </td>
+                    <td class="px-6 py-3 text-sa-muted">
+                        {% if c.regional %}
+                        <span class="px-2 py-0.5 bg-slate-100 rounded text-[9px] font-bold uppercase">{{ c.regional }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    {% if current_user.role == 'admin' %}
+                    <td class="px-6 py-3 text-right">
+                        <button data-id="{{ c.id }}" data-nome="{{ c.nome | e }}" data-email="{{ c.email | e }}"
+                                onclick="abrirModalEdicao(this)"
+                                class="text-[10px] font-bold text-sa-wine hover:underline uppercase">Editar</button>
+                    </td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
+                <tr id="empty-corretores" class="hidden">
+                    <td colspan="4" class="px-6 py-10 text-center text-sa-muted text-[11px]">Nenhum corretor encontrado.</td>
+                </tr>
             </tbody>
         </table>
     </div>
 
+    <!-- Supervisores -->
     <div id="section-supervisores" class="hidden bg-white border border-sa-gray rounded shadow-sm overflow-hidden">
-        <table id="table-supervisores" class="w-full text-left text-xs">
-            <thead class="bg-slate-50 text-sa-muted font-bold uppercase tracking-wider">
+        <table class="w-full text-left text-[11px]">
+            <thead class="bg-slate-50 text-sa-muted font-bold uppercase tracking-wider text-[10px]">
                 <tr>
                     <th class="px-6 py-3 border-b border-sa-gray">Empreendimento</th>
                     <th class="px-6 py-3 border-b border-sa-gray">CC 1</th>
                     <th class="px-6 py-3 border-b border-sa-gray">CC 2</th>
-                    <th class="px-6 py-3 border-b border-sa-gray text-right">Ação</th>
+                    <th class="px-6 py-3 border-b border-sa-gray">Regional</th>
+                    {% if current_user.role == 'admin' %}
+                    <th class="px-6 py-3 border-b border-sa-gray text-right">Ações</th>
+                    {% endif %}
                 </tr>
             </thead>
-            <tbody class="divide-y divide-sa-gray">
+            <tbody id="tbody-supervisores" class="divide-y divide-sa-gray">
                 {% for emp in empreendimentos %}
-                <tr class="hover:bg-slate-50 transition-colors">
-                    <td class="px-6 py-4 font-bold text-sa-text uppercase tracking-tight">{{ emp.empreendimento }}</td>
-                    <td class="px-6 py-4 text-sa-muted">{{ emp.supervisor or '-' }}</td>
-                    <td class="px-6 py-4 text-sa-muted">{{ emp.supervisor2 or '-' }}</td>
-                    <td class="px-6 py-4 text-right">
-                        <button onclick="abrirModalEmp({{ emp.id }}, '{{ emp.empreendimento }}', '{{ emp.supervisor }}', '{{ emp.supervisor2 }}')" class="text-sa-wine hover:underline font-bold uppercase text-[10px]">Editar</button>
+                <tr class="hover:bg-slate-50 transition-colors row-supervisor"
+                    data-emp="{{ emp.empreendimento | lower }}"
+                    data-sup="{{ (emp.supervisor or '') | lower }}">
+                    <td class="px-6 py-3 font-semibold text-sa-text uppercase">{{ emp.empreendimento }}</td>
+                    <td class="px-6 py-3 text-sa-muted">{{ emp.supervisor or '-' }}</td>
+                    <td class="px-6 py-3 text-sa-muted">{{ emp.supervisor2 or '-' }}</td>
+                    <td class="px-6 py-3 text-sa-muted">
+                        {% if emp.regional %}
+                        <span class="px-2 py-0.5 bg-slate-100 rounded text-[9px] font-bold uppercase">{{ emp.regional }}</span>
+                        {% else %}-{% endif %}
                     </td>
+                    {% if current_user.role == 'admin' %}
+                    <td class="px-6 py-3 text-right">
+                        <button data-id="{{ emp.id }}" data-emp="{{ emp.empreendimento | e }}"
+                                data-sup1="{{ (emp.supervisor or '') | e }}" data-sup2="{{ (emp.supervisor2 or '') | e }}"
+                                onclick="abrirModalEmp(this)"
+                                class="text-[10px] font-bold text-sa-wine hover:underline uppercase">Editar</button>
+                    </td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
+                <tr id="empty-supervisores" class="hidden">
+                    <td colspan="5" class="px-6 py-10 text-center text-sa-muted text-[11px]">Nenhum empreendimento encontrado.</td>
+                </tr>
             </tbody>
         </table>
     </div>
 </div>
 
-<!-- Modal Edição Corretor -->
+<!-- Modal Corretor -->
 <div id="modal-corretor" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6">
     <div class="fixed inset-0 bg-sa-dark/80 backdrop-blur-sm" onclick="fecharModal()"></div>
     <div class="relative bg-white rounded-lg w-full max-w-md p-8 shadow-2xl">
@@ -82,21 +128,24 @@
         <div class="space-y-4">
             <div class="space-y-1">
                 <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Nome Completo</label>
-                <input type="text" id="edit-nome" class="w-full h-11 px-4 bg-slate-50 border border-sa-gray rounded text-sm font-medium focus:border-sa-wine transition-all">
+                <input type="text" id="edit-nome"
+                       class="w-full h-11 px-4 bg-slate-50 border border-sa-gray rounded text-sm font-medium focus:border-sa-wine outline-none transition-all">
             </div>
             <div class="space-y-1">
                 <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">E-mail</label>
-                <input type="email" id="edit-email" class="w-full h-11 px-4 bg-slate-50 border border-sa-gray rounded text-sm font-medium focus:border-sa-wine transition-all">
+                <input type="email" id="edit-email" placeholder="exemplo@email.com"
+                       class="w-full h-11 px-4 bg-slate-50 border border-sa-gray rounded text-sm font-medium focus:border-sa-wine outline-none transition-all">
+                <p id="email-error" class="hidden text-[10px] text-sa-red mt-1">E-mail inválido.</p>
             </div>
             <div class="flex gap-3 pt-4">
-                <button onclick="fecharModal()" class="flex-1 py-3 bg-slate-50 text-sa-muted font-bold rounded uppercase text-[10px] tracking-widest">Cancelar</button>
+                <button onclick="fecharModal()" class="flex-1 py-3 bg-slate-50 text-sa-muted font-bold rounded uppercase text-[10px] tracking-widest hover:bg-slate-100 transition-all">Cancelar</button>
                 <button onclick="salvarCorretor()" class="flex-1 py-3 bg-sa-wine text-white font-bold rounded uppercase text-[10px] tracking-widest hover:bg-sa-red transition-all">Salvar</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal Edição Empreendimento -->
+<!-- Modal Empreendimento -->
 <div id="modal-emp" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6">
     <div class="fixed inset-0 bg-sa-dark/80 backdrop-blur-sm" onclick="fecharModalEmp()"></div>
     <div class="relative bg-white rounded-lg w-full max-w-md p-8 shadow-2xl">
@@ -105,20 +154,22 @@
         <div class="space-y-4">
             <div id="div-emp-nome" class="space-y-1">
                 <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Nome do Empreendimento</label>
-                <input type="text" id="edit-emp-nome" class="w-full h-11 px-4 bg-slate-50 border border-sa-gray rounded text-sm font-medium focus:border-sa-wine transition-all">
+                <input type="text" id="edit-emp-nome"
+                       class="w-full h-11 px-4 bg-slate-50 border border-sa-gray rounded text-sm font-medium focus:border-sa-wine outline-none transition-all">
             </div>
-            <p id="emp-nome-display" class="hidden text-[11px] font-bold text-sa-wine uppercase mb-4"></p>
-            
+            <p id="emp-nome-display" class="hidden text-[11px] font-bold text-sa-wine uppercase"></p>
             <div class="space-y-1">
-                <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Supervisor 1</label>
-                <input type="text" id="edit-sup1" class="w-full h-11 px-4 bg-slate-50 border border-sa-gray rounded text-sm font-medium focus:border-sa-wine transition-all">
+                <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">E-mail CC 1</label>
+                <input type="email" id="edit-sup1" placeholder="supervisor@email.com"
+                       class="w-full h-11 px-4 bg-slate-50 border border-sa-gray rounded text-sm font-medium focus:border-sa-wine outline-none transition-all">
             </div>
             <div class="space-y-1">
-                <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Supervisor 2</label>
-                <input type="text" id="edit-sup2" class="w-full h-11 px-4 bg-slate-50 border border-sa-gray rounded text-sm font-medium focus:border-sa-wine transition-all">
+                <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">E-mail CC 2 (opcional)</label>
+                <input type="email" id="edit-sup2" placeholder="supervisor2@email.com"
+                       class="w-full h-11 px-4 bg-slate-50 border border-sa-gray rounded text-sm font-medium focus:border-sa-wine outline-none transition-all">
             </div>
             <div class="flex gap-3 pt-4">
-                <button onclick="fecharModalEmp()" class="flex-1 py-3 bg-slate-50 text-sa-muted font-bold rounded uppercase text-[10px] tracking-widest">Cancelar</button>
+                <button onclick="fecharModalEmp()" class="flex-1 py-3 bg-slate-50 text-sa-muted font-bold rounded uppercase text-[10px] tracking-widest hover:bg-slate-100 transition-all">Cancelar</button>
                 <button onclick="salvarEmp()" class="flex-1 py-3 bg-sa-wine text-white font-bold rounded uppercase text-[10px] tracking-widest hover:bg-sa-red transition-all">Salvar</button>
             </div>
         </div>
@@ -127,31 +178,56 @@
 
 <script>
 let currentTab = 'corretores';
+
 function switchTab(tab) {
     currentTab = tab;
-    const secC = document.getElementById('section-corretores');
-    const secS = document.getElementById('section-supervisores');
-    const tabC = document.getElementById('tab-corretores');
-    const tabS = document.getElementById('tab-supervisores');
-    if (tab === 'corretores') {
-        secC.classList.remove('hidden'); secS.classList.add('hidden');
-        tabC.className = "px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all bg-white shadow-sm text-sa-text";
-        tabS.className = "px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all text-sa-muted hover:text-sa-text";
+    const isC = tab === 'corretores';
+    document.getElementById('section-corretores').classList.toggle('hidden', !isC);
+    document.getElementById('section-supervisores').classList.toggle('hidden', isC);
+    const activeClass  = 'px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all bg-white shadow-sm text-sa-text';
+    const inactiveClass = 'px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all text-sa-muted hover:text-sa-text';
+    document.getElementById('tab-corretores').className  = isC ? activeClass : inactiveClass;
+    document.getElementById('tab-supervisores').className = isC ? inactiveClass : activeClass;
+    document.getElementById('search-input').value = '';
+    filterUnified();
+}
+
+function filterUnified() {
+    const q = document.getElementById('search-input').value.toLowerCase().trim();
+    if (currentTab === 'corretores') {
+        const rows = document.querySelectorAll('.row-corretor');
+        let count = 0;
+        rows.forEach(function(r) {
+            const ok = !q || r.dataset.nome.includes(q) || r.dataset.email.includes(q);
+            r.style.display = ok ? '' : 'none';
+            if (ok) count++;
+        });
+        document.getElementById('empty-corretores').classList.toggle('hidden', count > 0);
+        document.getElementById('search-count').textContent = q ? count + ' de ' + rows.length : '';
     } else {
-        secC.classList.add('hidden'); secS.classList.remove('hidden');
-        tabS.className = "px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all bg-white shadow-sm text-sa-text";
-        tabC.className = "px-6 py-2 rounded text-[11px] font-bold uppercase tracking-widest transition-all text-sa-muted hover:text-sa-text";
+        const rows = document.querySelectorAll('.row-supervisor');
+        let count = 0;
+        rows.forEach(function(r) {
+            const ok = !q || r.dataset.emp.includes(q) || r.dataset.sup.includes(q);
+            r.style.display = ok ? '' : 'none';
+            if (ok) count++;
+        });
+        document.getElementById('empty-supervisores').classList.toggle('hidden', count > 0);
+        document.getElementById('search-count').textContent = q ? count + ' de ' + rows.length : '';
     }
 }
+
 function abrirNovo() {
     if (currentTab === 'corretores') {
-        document.getElementById('modal-corretor-title').innerText = 'Adicionar Corretor';
+        document.getElementById('modal-corretor-title').textContent = 'Adicionar Corretor';
         document.getElementById('edit-id').value = '';
         document.getElementById('edit-nome').value = '';
         document.getElementById('edit-email').value = '';
+        document.getElementById('email-error').classList.add('hidden');
         document.getElementById('modal-corretor').classList.remove('hidden');
+        setTimeout(function() { document.getElementById('edit-nome').focus(); }, 50);
     } else {
-        document.getElementById('modal-emp-title').innerText = 'Adicionar Empreendimento';
+        document.getElementById('modal-emp-title').textContent = 'Adicionar Empreendimento';
         document.getElementById('edit-emp-id').value = '';
         document.getElementById('edit-emp-nome').value = '';
         document.getElementById('div-emp-nome').classList.remove('hidden');
@@ -161,68 +237,70 @@ function abrirNovo() {
         document.getElementById('modal-emp').classList.remove('hidden');
     }
 }
-function filterUnified() {
-    const filter = document.getElementById('search-input').value.toUpperCase();
-    const tableId = currentTab === 'corretores' ? 'table-corretores' : 'table-supervisores';
-    const table = document.getElementById(tableId);
-    const tr = table.getElementsByTagName("tr");
-    for (let i = 1; i < tr.length; i++) {
-        const td = tr[i].getElementsByTagName("td")[currentTab === 'corretores' ? 1 : 0];
-        if (td) {
-            const txtValue = td.textContent || td.innerText;
-            tr[i].style.display = txtValue.toUpperCase().indexOf(filter) > -1 ? "" : "none";
-        }
-    }
-}
-function abrirModalEdicao(id, nome, email) {
-    document.getElementById('modal-corretor-title').innerText = 'Editar Corretor';
-    document.getElementById('edit-id').value = id;
-    document.getElementById('edit-nome').value = nome;
-    document.getElementById('edit-email').value = email;
+
+function abrirModalEdicao(btn) {
+    document.getElementById('modal-corretor-title').textContent = 'Editar Corretor';
+    document.getElementById('edit-id').value = btn.dataset.id;
+    document.getElementById('edit-nome').value = btn.dataset.nome;
+    document.getElementById('edit-email').value = btn.dataset.email;
+    document.getElementById('email-error').classList.add('hidden');
     document.getElementById('modal-corretor').classList.remove('hidden');
 }
+
 function fecharModal() { document.getElementById('modal-corretor').classList.add('hidden'); }
+
 function salvarCorretor() {
-    const data = { 
-        id: document.getElementById('edit-id').value, 
-        nome: document.getElementById('edit-nome').value, 
-        email: document.getElementById('edit-email').value 
-    };
-    fetch('/api/editar_corretor', { 
-        method: 'POST', 
-        headers: {'Content-Type': 'application/json'}, 
-        body: JSON.stringify(data) 
-    }).then(r => r.json()).then(res => {
-        if (res.sucesso) window.location.reload();
-        else alert('Erro: ' + res.erro);
+    const nome  = document.getElementById('edit-nome').value.trim();
+    const email = document.getElementById('edit-email').value.trim();
+    const emailErr = document.getElementById('email-error');
+
+    if (!nome) { showToast('Nome é obrigatório.', 'error'); return; }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        emailErr.classList.remove('hidden'); return;
+    }
+    emailErr.classList.add('hidden');
+
+    fetch('/api/editar_corretor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: document.getElementById('edit-id').value, nome: nome, email: email })
+    }).then(function(r) { return r.json(); }).then(function(res) {
+        if (res.sucesso) { fecharModal(); window.location.reload(); }
+        else showToast('Erro: ' + res.erro, 'error');
     });
 }
-function abrirModalEmp(id, nome, sup1, sup2) {
-    document.getElementById('modal-emp-title').innerText = 'Editar CCs';
-    document.getElementById('edit-emp-id').value = id;
+
+function abrirModalEmp(btn) {
+    document.getElementById('modal-emp-title').textContent = 'Editar CCs';
+    document.getElementById('edit-emp-id').value = btn.dataset.id;
     document.getElementById('div-emp-nome').classList.add('hidden');
-    document.getElementById('emp-nome-display').innerText = nome;
+    document.getElementById('emp-nome-display').textContent = btn.dataset.emp;
     document.getElementById('emp-nome-display').classList.remove('hidden');
-    document.getElementById('edit-sup1').value = sup1;
-    document.getElementById('edit-sup2').value = sup2;
+    document.getElementById('edit-sup1').value = btn.dataset.sup1;
+    document.getElementById('edit-sup2').value = btn.dataset.sup2;
     document.getElementById('modal-emp').classList.remove('hidden');
 }
+
 function fecharModalEmp() { document.getElementById('modal-emp').classList.add('hidden'); }
+
 function salvarEmp() {
-    const data = { 
-        id: document.getElementById('edit-emp-id').value, 
-        empreendimento: document.getElementById('edit-emp-nome').value,
-        supervisor: document.getElementById('edit-sup1').value, 
-        supervisor2: document.getElementById('edit-sup2').value 
-    };
-    fetch('/api/editar_empreendimento', { 
-        method: 'POST', 
-        headers: {'Content-Type': 'application/json'}, 
-        body: JSON.stringify(data) 
-    }).then(r => r.json()).then(res => {
-        if (res.sucesso) window.location.reload();
-        else alert('Erro: ' + res.erro);
+    fetch('/api/editar_empreendimento', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            id: document.getElementById('edit-emp-id').value,
+            empreendimento: document.getElementById('edit-emp-nome').value,
+            supervisor: document.getElementById('edit-sup1').value.trim(),
+            supervisor2: document.getElementById('edit-sup2').value.trim()
+        })
+    }).then(function(r) { return r.json(); }).then(function(res) {
+        if (res.sucesso) { fecharModalEmp(); window.location.reload(); }
+        else showToast('Erro: ' + res.erro, 'error');
     });
 }
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { fecharModal(); fecharModalEmp(); }
+});
 </script>
 {% endblock %}

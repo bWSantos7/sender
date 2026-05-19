@@ -27,19 +27,23 @@
 
             <div class="space-y-3">
                 <label class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">2. Arquivo Base</label>
-                <div class="relative border-2 border-dashed border-sa-gray rounded-lg p-10 text-center hover:bg-slate-50 transition-colors group">
-                    <input type="file" name="planilha" id="planilha" accept=".xlsx, .xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required>
-                    <div class="flex flex-col items-center">
-                        <i data-lucide="upload" class="w-8 h-8 text-sa-gray mb-3 group-hover:text-sa-wine transition-colors"></i>
-                        <p id="file-name" class="text-sm font-bold text-sa-text">Selecione o arquivo Excel</p>
-                        <p class="text-[10px] text-sa-muted mt-1">Formatos suportados: .xlsx, .xls</p>
+                <div id="drop-zone"
+                     class="relative border-2 border-dashed border-sa-gray rounded-lg p-10 text-center hover:bg-slate-50 transition-colors group cursor-pointer">
+                    <input type="file" name="planilha" id="planilha" accept=".xlsx,.xls"
+                           class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" required>
+                    <div class="flex flex-col items-center pointer-events-none">
+                        <i data-lucide="file-spreadsheet" class="w-8 h-8 text-sa-gray mb-3 group-hover:text-sa-wine transition-colors" id="drop-icon"></i>
+                        <p id="file-name" class="text-sm font-bold text-sa-text">Arraste o arquivo ou clique para selecionar</p>
+                        <p class="text-[10px] text-sa-muted mt-1">Formatos aceitos: .xlsx, .xls · Máx. 20 MB</p>
                     </div>
                 </div>
+                <p id="file-error" class="hidden text-[10px] text-sa-red font-semibold"></p>
             </div>
 
-            <button type="submit" id="submit-btn" class="w-full bg-sa-dark text-white font-bold py-4 rounded hover:bg-sa-wine transition-all flex items-center justify-center gap-2">
+            <button type="submit" id="submit-btn"
+                    class="w-full bg-sa-dark text-white font-bold py-4 rounded hover:bg-sa-wine transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 <i data-lucide="play" class="w-4 h-4"></i>
-                PROCESSAR DADOS
+                Processar Dados
             </button>
         </form>
 
@@ -47,28 +51,65 @@
             <div class="flex flex-col items-center">
                 <div class="w-10 h-10 border-2 border-sa-gray border-t-sa-wine rounded-full animate-spin mb-4"></div>
                 <p class="text-[10px] font-bold text-sa-wine uppercase tracking-widest animate-pulse">Gerando relatórios...</p>
+                <p class="text-[10px] text-sa-muted mt-2">Isso pode levar alguns segundos...</p>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    const fileInput = document.getElementById('planilha');
-    const fileNameDisplay = document.getElementById('file-name');
-    const form = document.getElementById('upload-form');
-    const submitBtn = document.getElementById('submit-btn');
-    const loadingState = document.getElementById('loading-state');
+const fileInput = document.getElementById('planilha');
+const fileNameDisplay = document.getElementById('file-name');
+const fileError = document.getElementById('file-error');
+const dropZone = document.getElementById('drop-zone');
+const dropIcon = document.getElementById('drop-icon');
+const form = document.getElementById('upload-form');
+const submitBtn = document.getElementById('submit-btn');
+const loadingState = document.getElementById('loading-state');
+const MAX_MB = 20;
 
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files.length > 0) {
-            fileNameDisplay.innerText = e.target.files[0].name;
-            fileNameDisplay.classList.add('text-sa-wine');
-        }
-    });
+function validarArquivo(file) {
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx', 'xls'].includes(ext)) {
+        fileError.textContent = 'Formato inválido. Use .xlsx ou .xls.';
+        fileError.classList.remove('hidden');
+        fileInput.value = '';
+        return;
+    }
+    if (file.size > MAX_MB * 1024 * 1024) {
+        fileError.textContent = 'Arquivo muito grande. Máximo ' + MAX_MB + ' MB.';
+        fileError.classList.remove('hidden');
+        fileInput.value = '';
+        return;
+    }
+    fileError.classList.add('hidden');
+    const kb = (file.size / 1024).toFixed(1);
+    fileNameDisplay.textContent = file.name + ' (' + kb + ' KB)';
+    fileNameDisplay.className = 'text-sm font-bold text-sa-wine';
+    dropZone.classList.add('border-sa-wine', 'bg-red-50/30');
+}
 
-    form.addEventListener('submit', () => {
-        submitBtn.classList.add('hidden');
-        loadingState.classList.remove('hidden');
-    });
+fileInput.addEventListener('change', function(e) { validarArquivo(e.target.files[0]); });
+
+dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('bg-slate-100', 'border-sa-wine'); });
+dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('bg-slate-100', 'border-sa-wine'); });
+dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropZone.classList.remove('bg-slate-100', 'border-sa-wine');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        validarArquivo(file);
+    }
+});
+
+form.addEventListener('submit', function(e) {
+    if (!fileInput.files.length) { e.preventDefault(); showToast('Selecione um arquivo antes de processar.', 'warning'); return; }
+    submitBtn.classList.add('hidden');
+    loadingState.classList.remove('hidden');
+});
 </script>
 {% endblock %}
