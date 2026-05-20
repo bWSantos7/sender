@@ -30,14 +30,25 @@
                     </span>
                     {% if current_user.role == 'admin' %}
                     <div class="flex items-center gap-2">
-                        <button type="button" onclick="abrirModalEditar('{{ l.id }}', '{{ l.nome|escape }}', '{{ l.link|escape }}', '{{ l.prazo_abertura|escape }}', '{{ l.prazo_encerramento|escape }}', '{{ l.status|escape }}', '{{ l.regional|escape }}')" class="text-sa-muted hover:text-sa-wine transition-colors" title="Editar Link">
+                        <button type="button"
+                                data-id="{{ l.id }}"
+                                data-nome="{{ l.nome }}"
+                                data-link="{{ l.link }}"
+                                data-prazo-abertura="{{ l.prazo_abertura or '' }}"
+                                data-prazo-encerramento="{{ l.prazo_encerramento or '' }}"
+                                data-status="{{ l.status }}"
+                                data-regional="{{ l.regional or '' }}"
+                                onclick="abrirModalEditar(this)"
+                                class="text-sa-muted hover:text-sa-wine transition-colors" title="Editar Link">
                             <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                         </button>
-                        <form action="{{ url_for('excluir_link', id=l.id) }}" method="POST" onsubmit="return confirm('Excluir este link?')" class="m-0">
-                            <button type="submit" class="text-sa-muted hover:text-red-500 transition-colors" title="Excluir Link">
-                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                            </button>
-                        </form>
+                        <button type="button"
+                                data-action="{{ url_for('excluir_link', id=l.id) }}"
+                                data-nome="{{ l.nome }}"
+                                onclick="confirmarExcluirLink(this)"
+                                class="text-sa-muted hover:text-red-500 transition-colors" title="Excluir Link">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
                     </div>
                     {% endif %}
                 </div>
@@ -131,6 +142,31 @@
 </div>
 {% endif %}
 
+<!-- Modal Confirmar Exclusão de Link -->
+{% if current_user.role == 'admin' %}
+<div id="modal-excluir-link" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 space-y-6">
+        <div class="text-center">
+            <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="trash-2" class="w-6 h-6 text-red-600"></i>
+            </div>
+            <h3 class="text-lg font-bold text-sa-text">Excluir Link</h3>
+            <p id="modal-excluir-link-msg" class="text-xs text-sa-muted mt-2"></p>
+        </div>
+        <form id="form-excluir-link" action="" method="POST">
+            <div class="flex gap-3">
+                <button type="button" onclick="document.getElementById('modal-excluir-link').classList.add('hidden')" class="flex-1 py-3 border border-sa-gray text-sa-muted rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition-all">
+                    Cancelar
+                </button>
+                <button type="submit" class="flex-1 py-3 bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all">
+                    Excluir
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+
 <!-- Modal Editar Link -->
 {% if current_user.role == 'admin' %}
 <div id="modal-editar-link" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
@@ -207,23 +243,31 @@ function copiarLink(url, btn) {
     });
 }
 
-function abrirModalEditar(id, nome, link, prazoAbertura, prazoEncerramento, status, regional) {
-    const modal = document.getElementById('modal-editar-link');
+function abrirModalEditar(btn) {
+    const d = btn.dataset;
     const form = document.getElementById('form-editar-link');
-    
-    // Atualiza a URL de envio (action) do formulário
-    form.action = `/links/editar/${id}`;
-    
-    // Preenche os campos
-    document.getElementById('edit-nome').value = nome;
-    document.getElementById('edit-link').value = link;
-    document.getElementById('edit-prazo-abertura').value = prazoAbertura;
-    document.getElementById('edit-prazo-encerramento').value = prazoEncerramento;
-    document.getElementById('edit-status').value = status;
-    document.getElementById('edit-regional').value = regional;
-    
-    // Mostra o modal
-    modal.classList.remove('hidden');
+    form.action = `/links/editar/${d.id}`;
+    document.getElementById('edit-nome').value = d.nome;
+    document.getElementById('edit-link').value = d.link;
+    document.getElementById('edit-prazo-abertura').value = d.prazoAbertura;
+    document.getElementById('edit-prazo-encerramento').value = d.prazoEncerramento;
+    document.getElementById('edit-status').value = d.status;
+    document.getElementById('edit-regional').value = d.regional;
+    document.getElementById('modal-editar-link').classList.remove('hidden');
 }
+
+function confirmarExcluirLink(btn) {
+    document.getElementById('modal-excluir-link-msg').textContent = `"${btn.dataset.nome}" será removido permanentemente.`;
+    document.getElementById('form-excluir-link').action = btn.dataset.action;
+    document.getElementById('modal-excluir-link').classList.remove('hidden');
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('modal-link').classList.add('hidden');
+        document.getElementById('modal-editar-link').classList.add('hidden');
+        document.getElementById('modal-excluir-link').classList.add('hidden');
+    }
+});
 </script>
 {% endblock %}

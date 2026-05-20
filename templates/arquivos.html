@@ -27,6 +27,27 @@
         </div>
     </div>
 
+    <!-- Modal Confirmação Exclusão -->
+    <div id="modal-excluir" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 space-y-6">
+            <div class="text-center">
+                <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="trash-2" class="w-6 h-6 text-red-600"></i>
+                </div>
+                <h3 class="text-lg font-bold text-sa-text">Confirmar Exclusão</h3>
+                <p id="modal-excluir-msg" class="text-xs text-sa-muted mt-2"></p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('modal-excluir').classList.add('hidden')" class="flex-1 py-3 border border-sa-gray text-sa-muted rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition-all">
+                    Cancelar
+                </button>
+                <button id="btn-confirmar-excluir" class="flex-1 py-3 bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all">
+                    Excluir
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Simples de Seleção de Pasta -->
     <div id="modal-upload" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 space-y-6">
@@ -280,7 +301,7 @@ function baixarSelecionados() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ arquivos: paths })
     }).then(r => {
-        if (!r.ok) { alert('Erro ao gerar o ZIP.'); return; }
+        if (!r.ok) { showToast('Erro ao gerar o ZIP.', 'error'); return; }
         const disp = r.headers.get('Content-Disposition') || '';
         const match = disp.match(/filename=(.+)/);
         const nome = match ? match[1] : 'arquivos.zip';
@@ -295,9 +316,21 @@ function baixarSelecionados() {
 }
 function excluirSelecionados() {
     const paths = Array.from(document.querySelectorAll('.file-checkbox:checked')).map(cb => cb.dataset.path);
-    if (paths.length === 0) return;
-    if (!confirm(`Excluir ${paths.length} arquivos?`)) return;
-    fetch('/api/excluir_arquivos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ arquivos: paths }) }).then(() => window.location.reload());
+    if (paths.length === 0) { showToast('Nenhum arquivo selecionado.', 'warning'); return; }
+    const modal = document.getElementById('modal-excluir');
+    document.getElementById('modal-excluir-msg').textContent = `${paths.length} arquivo(s) serão excluídos permanentemente. Esta ação não pode ser desfeita.`;
+    document.getElementById('btn-confirmar-excluir').onclick = function() {
+        modal.classList.add('hidden');
+        fetch('/api/excluir_arquivos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ arquivos: paths }) })
+            .then(r => r.json())
+            .then(data => {
+                if (data.sucesso) { showToast(paths.length + ' arquivo(s) excluído(s).', 'success'); setTimeout(() => window.location.reload(), 1000); }
+                else { showToast('Erro ao excluir: ' + (data.erro || 'desconhecido'), 'error'); }
+            })
+            .catch(() => showToast('Erro de conexão ao excluir.', 'error'));
+    };
+    modal.classList.remove('hidden');
+    lucide.createIcons({ nodes: [modal] });
 }
 
 let arquivosParaSubir = null;
@@ -331,14 +364,15 @@ function confirmarUpload(event) {
         body: formData
     }).then(r => r.json()).then(data => {
         if (data.sucesso) {
-            window.location.reload();
+            showToast('Arquivos enviados com sucesso!', 'success');
+            setTimeout(() => window.location.reload(), 1000);
         } else {
-            alert('Erro: ' + data.erro);
+            showToast('Erro: ' + (data.erro || 'desconhecido'), 'error');
             btn.innerText = originalText;
             btn.disabled = false;
         }
-    }).catch(err => {
-        alert('Erro de conexão');
+    }).catch(() => {
+        showToast('Erro de conexão ao enviar arquivos.', 'error');
         btn.innerText = originalText;
         btn.disabled = false;
     });

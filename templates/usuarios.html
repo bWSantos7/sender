@@ -5,14 +5,21 @@
 
 {% block content %}
 <div class="bg-white rounded-xl shadow-sm border border-sa-gray overflow-hidden">
-    <div class="p-6 border-b border-sa-gray flex justify-between items-center bg-gray-50/50">
+    <div class="p-6 border-b border-sa-gray flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50">
         <div>
             <h2 class="text-lg font-bold text-sa-wine">Usuários do Sistema</h2>
             <p class="text-xs text-sa-muted mt-1">Gerencie acessos, perfis e regionais.</p>
         </div>
-        <button onclick="document.getElementById('modal-usuario').classList.remove('hidden')" class="bg-sa-wine text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-sa-wine/90 flex items-center gap-2 transition-all">
-            <i data-lucide="user-plus" class="w-4 h-4"></i> NOVO USUÁRIO
-        </button>
+        <div class="flex items-center gap-3">
+            <div class="relative">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-sa-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                <input type="text" id="busca-usuario" placeholder="Buscar usuário..." oninput="filtrarUsuarios()"
+                       class="pl-9 pr-4 py-2 text-xs bg-white border border-sa-gray rounded-lg outline-none focus:border-sa-wine transition-all w-52">
+            </div>
+            <button onclick="document.getElementById('modal-usuario').classList.remove('hidden')" class="bg-sa-wine text-white px-4 py-2 rounded-lg text-xs font-bold shadow-md hover:bg-sa-wine/90 flex items-center gap-2 transition-all">
+                <i data-lucide="user-plus" class="w-4 h-4"></i> NOVO USUÁRIO
+            </button>
+        </div>
     </div>
 
     <div class="overflow-x-auto">
@@ -25,9 +32,9 @@
                     <th class="px-6 py-4 border-b border-sa-gray text-right">Ações</th>
                 </tr>
             </thead>
-            <tbody class="text-sm divide-y divide-sa-gray">
+            <tbody class="text-sm divide-y divide-sa-gray" id="tabela-usuarios">
                 {% for u in usuarios %}
-                <tr class="hover:bg-gray-50 transition-colors">
+                <tr class="hover:bg-gray-50 transition-colors user-row" data-username="{{ u.username | lower }}" data-regional="{{ (u.regional or '') | lower }}">
                     <td class="px-6 py-4 font-semibold text-sa-text">{{ u.username }}</td>
                     <td class="px-6 py-4">
                         <span class="px-2 py-1 rounded text-[10px] font-black {% if u.role == 'admin' %} bg-sa-wine/10 text-sa-wine border border-sa-wine/20 {% else %} bg-slate-100 text-slate-600 border border-slate-200 {% endif %}">
@@ -43,17 +50,42 @@
                     </td>
                     <td class="px-6 py-4 text-right">
                         {% if u.id != current_user.id %}
-                        <form action="{{ url_for('excluir_usuario', id=u.id) }}" method="POST" onsubmit="return confirm('Excluir este usuário permanentemente?')">
-                            <button type="submit" class="text-red-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-all">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i>
-                            </button>
-                        </form>
+                        <button type="button"
+                                data-action="{{ url_for('excluir_usuario', id=u.id) }}"
+                                data-username="{{ u.username }}"
+                                onclick="confirmarExcluirUsuario(this)"
+                                class="text-red-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-all">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
                         {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- Modal Confirmar Exclusão de Usuário -->
+<div id="modal-excluir-usuario" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 space-y-6">
+        <div class="text-center">
+            <div class="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="user-x" class="w-6 h-6 text-red-600"></i>
+            </div>
+            <h3 class="text-lg font-bold text-sa-text">Excluir Usuário</h3>
+            <p id="modal-excluir-usuario-msg" class="text-xs text-sa-muted mt-2"></p>
+        </div>
+        <form id="form-excluir-usuario" action="" method="POST">
+            <div class="flex gap-3">
+                <button type="button" onclick="document.getElementById('modal-excluir-usuario').classList.add('hidden')" class="flex-1 py-3 border border-sa-gray text-sa-muted rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition-all">
+                    Cancelar
+                </button>
+                <button type="submit" class="flex-1 py-3 bg-red-600 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-red-700 transition-all">
+                    Excluir
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -103,4 +135,28 @@
         </form>
     </div>
 </div>
+
+<script>
+function confirmarExcluirUsuario(btn) {
+    document.getElementById('modal-excluir-usuario-msg').textContent = 'O usuário "' + btn.dataset.username + '" será removido permanentemente.';
+    document.getElementById('form-excluir-usuario').action = btn.dataset.action;
+    document.getElementById('modal-excluir-usuario').classList.remove('hidden');
+    lucide.createIcons({ nodes: [document.getElementById('modal-excluir-usuario')] });
+}
+
+function filtrarUsuarios() {
+    const q = document.getElementById('busca-usuario').value.toLowerCase().trim();
+    document.querySelectorAll('.user-row').forEach(function(row) {
+        const match = row.dataset.username.includes(q) || row.dataset.regional.includes(q);
+        row.style.display = match ? '' : 'none';
+    });
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.getElementById('modal-usuario').classList.add('hidden');
+        document.getElementById('modal-excluir-usuario').classList.add('hidden');
+    }
+});
+</script>
 {% endblock %}
