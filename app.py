@@ -194,9 +194,19 @@ def load_user(user_id):
 
 with app.app_context():
     db.create_all()
+
+    # Migração: renomear tipo e resetar CNPJ customizados para usar template padrão completo
+    old_conf = Configuracao.query.filter_by(tipo='Premiação - Metas').first()
+    if old_conf:
+        old_conf.tipo = 'Comissão IR Futuro'
+        db.session.commit()
+    for conf in Configuracao.query.all():
+        conf.email_cnpjs = None
+    db.session.commit()
+
     # Inicializar configuração padrão se não existir
     if not Configuracao.query.first():
-        for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'Premiação - Metas', 'House', 'Staff']:
+        for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'Comissão IR Futuro', 'House', 'Staff']:
             conf = Configuracao(
                 tipo=tipo,
                 link_form='https://forms.gle/exemplo',
@@ -866,7 +876,7 @@ def configuracoes():
         db.session.commit()
 
     # Garantir que todos os tipos de configuração existem
-    for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'Premiação - Metas', 'House', 'Staff']:
+    for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'Comissão IR Futuro', 'House', 'Staff']:
         if not Configuracao.query.filter_by(tipo=tipo).first():
             db.session.add(Configuracao(tipo=tipo))
     db.session.commit()
