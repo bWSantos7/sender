@@ -152,9 +152,8 @@ function limparFiltros() {
 function abrirPDF(caminhoFull) {
     const parts = caminhoFull.split(/[\\/]/);
     const idx = parts.indexOf('uploads');
-    if (idx !== -1) {
-        window.open('/api/visualizar_arquivo/' + parts.slice(idx + 1).join('/'), '_blank');
-    }
+    const relPath = idx !== -1 ? parts.slice(idx + 1).join('/') : parts.join('/');
+    if (relPath) window.open('/api/visualizar_arquivo/' + relPath, '_blank');
 }
 
 function updateDashboard() {
