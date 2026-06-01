@@ -261,7 +261,8 @@ def index():
     total_enviados = query.filter_by(status='Sucesso').count()
     total_erros = query.filter_by(status='Erro').count()
     ultimos_logs = query.order_by(EnvioLog.data_envio.desc()).limit(50).all()
-    return render_template('dashboard.html', total_enviados=total_enviados, total_erros=total_erros, logs=ultimos_logs)
+    tipos = [c.tipo for c in Configuracao.query.order_by(Configuracao.id).all()]
+    return render_template('dashboard.html', total_enviados=total_enviados, total_erros=total_erros, logs=ultimos_logs, tipos=tipos)
 
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required
@@ -378,7 +379,8 @@ def upload():
         flash(f"Planilha processada com sucesso! {len(resultado_pdf['pdfs'])} PDFs gerados. Verifique a fila de envio.", 'success')
         return redirect(url_for('fila'))
 
-    return render_template('upload.html')
+    tipos = [c.tipo for c in Configuracao.query.order_by(Configuracao.id).all()]
+    return render_template('upload.html', tipos=tipos)
 
 @app.route('/fila')
 @login_required
@@ -903,7 +905,7 @@ def configuracoes():
                 old_date = conf.data_limite_envio
                 old_pgto = conf.data_pagamento
                 old_mes = conf.mes_referencia
-                
+
                 new_date = request.form.get("data_limite_envio")
                 new_pgto = request.form.get("data_pagamento")
                 new_mes = request.form.get("mes_referencia")
@@ -917,12 +919,20 @@ def configuracoes():
                 # Sincronizar com o HTML customizado se ele existir
                 if conf.email_prazo and old_date and old_date != new_date:
                     conf.email_prazo = conf.email_prazo.replace(old_date, new_date)
-                
+
                 if conf.email_rodape and old_pgto and old_pgto != new_pgto:
                     conf.email_rodape = conf.email_rodape.replace(old_pgto, new_pgto)
 
                 if conf.email_titulo and old_mes and old_mes != new_mes:
                     conf.email_titulo = conf.email_titulo.replace(old_mes, new_mes)
+
+                # Renomear o tipo em cascata
+                novo_tipo = request.form.get('novo_tipo', '').strip()
+                if novo_tipo and novo_tipo != tipo:
+                    EnvioLog.query.filter_by(tipo=tipo).update({'tipo': novo_tipo})
+                    FilaUpload.query.filter_by(tipo=tipo).update({'tipo': novo_tipo})
+                    conf.tipo = novo_tipo
+                    tipo = novo_tipo
 
                 db.session.commit()
                 flash(f'Configurações de {tipo} salvas com sucesso.', 'success')
@@ -975,7 +985,8 @@ def arquivos():
                     'data': datetime.fromtimestamp(stats.st_mtime).strftime('%d/%m/%Y %H:%M')
                 })
                 
-    return render_template('arquivos.html', arquivos=lista_arquivos)
+    tipos = [c.tipo for c in Configuracao.query.order_by(Configuracao.id).all()]
+    return render_template('arquivos.html', arquivos=lista_arquivos, tipos=tipos)
 
 
 @app.route('/api/excluir_arquivos', methods=['POST'])

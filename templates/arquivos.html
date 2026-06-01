@@ -58,12 +58,7 @@
             
             <div class="space-y-3">
                 <select id="select-tipo-upload" class="w-full p-3 bg-slate-50 border border-sa-gray rounded text-xs outline-none focus:border-sa-wine transition-all">
-                    <option value="Adiantamento">Adiantamento</option>
-                    <option value="Repasse">Repasse</option>
-                    <option value="Prêmio">Prêmio</option>
-                    <option value="Comissão IR Futuro">Comissão IR Futuro</option>
-                    <option value="House">House</option>
-                    <option value="Staff">Staff</option>
+                    {% for t in tipos %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
                     <option value="Outros">Outros</option>
                 </select>
             </div>

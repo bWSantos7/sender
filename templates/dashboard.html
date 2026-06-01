@@ -51,12 +51,7 @@
             </div>
             <select id="filtro-tipo" onchange="filtrarTabela()" class="bg-white border border-sa-gray rounded-lg px-2 py-1.5 text-[11px] text-sa-muted outline-none focus:ring-1 focus:ring-sa-wine">
                 <option value="">Todos os tipos</option>
-                <option>Adiantamento</option>
-                <option>Repasse</option>
-                <option>Prêmio</option>
-                <option>Comissão IR Futuro</option>
-                <option>House</option>
-                <option>Staff</option>
+                {% for t in tipos %}<option>{{ t }}</option>{% endfor %}
             </select>
             <select id="filtro-status" onchange="filtrarTabela()" class="bg-white border border-sa-gray rounded-lg px-2 py-1.5 text-[11px] text-sa-muted outline-none focus:ring-1 focus:ring-sa-wine">
                 <option value="">Todos os status</option>

@@ -116,25 +116,31 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             {% for c in configs %}
             <div id="card-{{ loop.index }}" class="bg-white rounded-2xl shadow-sm border border-sa-gray overflow-hidden hover:shadow-md transition-all group config-card">
-                <div class="p-5 border-b border-sa-gray flex justify-between items-center group-hover:bg-slate-50 transition-all">
-                    <div>
-                        <h3 class="font-bold text-sa-dark text-lg">{{ c.tipo }}</h3>
-                        <p class="text-[10px] font-bold text-sa-muted uppercase tracking-widest mt-0.5">Template Ativo</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button onclick="toggleCardEdit('card-{{ loop.index }}')" class="p-2 text-sa-muted hover:text-sa-wine hover:bg-sa-wine/5 rounded-lg transition-all" title="Editar Template">
-                            <i data-lucide="pencil" class="w-4 h-4"></i>
-                        </button>
-                        <div class="w-8 h-8 rounded-full bg-sa-gray flex items-center justify-center text-sa-wine group-hover:scale-110 transition-all">
-                            <i data-lucide="layout-template" class="w-4 h-4"></i>
+                <form action="{{ url_for('configuracoes') }}" method="POST">
+                    <input type="hidden" name="section_type" value="config_tipo">
+                    <input type="hidden" name="tipo_alvo" value="{{ c.tipo }}">
+
+                    <div class="p-5 border-b border-sa-gray group-hover:bg-slate-50 transition-all">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1 pr-2">
+                                <h3 class="font-bold text-sa-dark text-lg nome-display">{{ c.tipo }}</h3>
+                                <input type="text" name="novo_tipo" value="{{ c.tipo }}"
+                                       class="nome-input hidden font-bold text-sa-dark text-base bg-white border-b-2 border-sa-wine outline-none w-full pb-0.5"
+                                       placeholder="Nome do tipo">
+                                <p class="text-[10px] font-bold text-sa-muted uppercase tracking-widest mt-0.5">Template Ativo</p>
+                            </div>
+                            <div class="flex items-center gap-2 flex-shrink-0">
+                                <button type="button" onclick="toggleCardEdit('card-{{ loop.index }}')" class="p-2 text-sa-muted hover:text-sa-wine hover:bg-sa-wine/5 rounded-lg transition-all" title="Editar Template">
+                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                </button>
+                                <div class="w-8 h-8 rounded-full bg-sa-gray flex items-center justify-center text-sa-wine group-hover:scale-110 transition-all">
+                                    <i data-lucide="layout-template" class="w-4 h-4"></i>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <form action="{{ url_for('configuracoes') }}" method="POST" class="p-5 space-y-4">
-                    <fieldset disabled class="space-y-4">
-                        <input type="hidden" name="section_type" value="config_tipo">
-                        <input type="hidden" name="tipo_alvo" value="{{ c.tipo }}">
-                        
+
+                    <fieldset disabled class="p-5 space-y-4">
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-[10px] font-bold text-sa-muted uppercase tracking-wider mb-1">Mês Ref.</label>
@@ -194,6 +200,8 @@
     .config-card.editing input {
         background-color: white !important;
     }
+    .config-card.editing .nome-display { display: none !important; }
+    .config-card.editing .nome-input { display: block !important; }
 </style>
 
 <script>
@@ -207,8 +215,8 @@ function toggleCardEdit(cardId) {
     if (!isEditing) {
         btn.classList.add('bg-sa-wine', 'text-white');
         btn.classList.remove('text-sa-muted');
-        const firstInput = fieldset.querySelector('input:not([type="hidden"])');
-        if (firstInput) firstInput.focus();
+        const nomeInput = card.querySelector('.nome-input');
+        if (nomeInput) nomeInput.focus();
     } else {
         btn.classList.remove('bg-sa-wine', 'text-white');
         btn.classList.add('text-sa-muted');
