@@ -41,7 +41,7 @@ class Configuracao(db.Model):
     email_rodape = db.Column(db.Text, nullable=True)
     email_cnpjs = db.Column(db.Text, nullable=True)
     email_prazo = db.Column(db.Text, nullable=True)
-    email_retroativo_titulo = db.Column(db.String(200), nullable=True)
+    email_retroativo_titulo = db.Column(db.Text, nullable=True)
     email_retroativo_texto = db.Column(db.Text, nullable=True)
 
 class LinkForm(db.Model):

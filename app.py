@@ -195,6 +195,15 @@ def load_user(user_id):
 with app.app_context():
     db.create_all()
 
+    # Migração: ampliar colunas VARCHAR para Text
+    try:
+        db.session.execute(db.text(
+            "ALTER TABLE configuracao ALTER COLUMN email_retroativo_titulo TYPE TEXT"
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
     # Migração: renomear tipo e resetar CNPJ customizados para usar template padrão completo
     old_conf = Configuracao.query.filter_by(tipo='Premiação - Metas').first()
     if old_conf:
