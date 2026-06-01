@@ -95,6 +95,7 @@ def gerar_html_email(nome_colaborador, tipo, config, token=None):
     subtitulo = config.get('email_subtitulo') or "Favor emitir e enviar a(s) nota(s) fiscal(is) conforme as orientações abaixo."
     
     msg_corpo = config.get('custom_message') or f"Boa tarde, <b>{nome_colaborador}</b>.<br><br>Solicitamos a emissão da(s) nota(s) fiscal(is) referente(s) ao {tipo.lower()} listado no anexo deste e-mail. O arquivo contém o valor total na última coluna (<b>VALOR TOTAL</b>)."
+    msg_corpo = msg_corpo.replace("Nome do Corretor Teste", nome_colaborador)
     if '<' not in msg_corpo: msg_corpo = msg_corpo.replace('\n', '<br>')
     
     alerta_amarelo = config.get('email_alerta_amarelo') or "<b>Atenção – Emissão de Nota Fiscal:</b><br>Ao emitir notas para o <b>CNPJ 10.268.911/0001-58</b>, verifiquem se o endereço está preenchido corretamente.<br>O endereço correto para emissão é:<br><b>R GENERAL CARNEIRO, 380 – Centro</b>"
