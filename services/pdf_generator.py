@@ -91,53 +91,39 @@ def gerar_pdfs(df, tipo_envio, mes_referencia, link_form):
 
             zebra = False
 
-            # Iterar linha a linha — as linhas TOTAL já vêm da planilha
-            for _, row in group.iterrows():
+            def draw_table_headers():
+                nonlocal y_position
+                c.setFont("Helvetica-Bold", 10)
+                c.setFillColor(MEDIUM_GREY)
+                c.setStrokeColor(BLACK)
+                c.setLineWidth(1)
+                c.rect(x_start, y_position - 25, sum(col_widths), 30, fill=1, stroke=1)
+                x = x_start
+                for i, header in enumerate(headers):
+                    c.setFillColor(BLACK)
+                    c.drawCentredString(x + col_widths[i] / 2, y_position - 15, header)
+                    x += col_widths[i]
+                y_position -= 30
+                c.setFont("Helvetica", 10)
+
+            def draw_row(emp_text, unidade_text, valor_str, is_total_row):
+                nonlocal y_position, zebra
                 if y_position < 140:
                     c.showPage()
                     draw_header()
                     y_position = height - 145
+                    draw_table_headers()
 
-                    c.setFont("Helvetica-Bold", 10)
-                    c.setFillColor(MEDIUM_GREY)
-                    c.setStrokeColor(BLACK)
-                    c.setLineWidth(1)
-                    c.rect(x_start, y_position - 25, sum(col_widths), 30, fill=1, stroke=1)
-
-                    x = x_start
-                    for i, header in enumerate(headers):
-                        c.setFillColor(BLACK)
-                        c.drawCentredString(x + col_widths[i] / 2, y_position - 15, header)
-                        x += col_widths[i]
-
-                    y_position -= 30
-                    c.setFont("Helvetica", 10)
-
-                is_total = str(row['UNIDADE']).strip().upper() == 'TOTAL'
-
-                # Fundo: amarelo para linhas TOTAL, zebra para as demais
-                if is_total:
+                if is_total_row:
                     c.setFillColor(YELLOW)
                 else:
                     c.setFillColor(LIGHT_GREY if zebra else WHITE)
 
                 c.rect(x_start, y_position - 22, sum(col_widths), 28, fill=1, stroke=0)
 
-                try:
-                    valor = float(row['VALOR TOTAL'])
-                    valor_str = f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                except Exception:
-                    valor_str = str(row['VALOR TOTAL'])
-
-                values = [
-                    str(row['EMPREENDIMENTO']),
-                    str(row['UNIDADE']),
-                    valor_str
-                ]
-
+                values = [emp_text, unidade_text, valor_str]
                 x = x_start
-                # Negrito nas linhas TOTAL
-                c.setFont("Helvetica-Bold" if is_total else "Helvetica", 10)
+                c.setFont("Helvetica-Bold" if is_total_row else "Helvetica", 10)
                 for i, value in enumerate(values):
                     c.setFillColor(BLACK)
                     c.drawCentredString(x + col_widths[i] / 2, y_position - 14, str(value)[:60])
@@ -153,8 +139,42 @@ def gerar_pdfs(df, tipo_envio, mes_referencia, link_form):
                     c.line(x_line, y_position - 22, x_line, y_position + 6)
 
                 y_position -= 28
-                if not is_total:
+                if not is_total_row:
                     zebra = not zebra
+
+            def fmt_valor(v):
+                try:
+                    return float(v)
+                except Exception:
+                    return 0.0
+
+            def fmt_brl(v):
+                return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+            # Filtrar linhas TOTAL vindas da planilha (serão recalculadas por empreendimento)
+            data_rows = group[group['UNIDADE'].str.strip().str.upper() != 'TOTAL'].copy()
+
+            # Pré-calcular total por empreendimento
+            totais_emp = (
+                data_rows.groupby('EMPREENDIMENTO')['VALOR TOTAL']
+                .apply(lambda s: sum(fmt_valor(v) for v in s))
+                .to_dict()
+            )
+
+            current_emp = None
+            for _, row in data_rows.iterrows():
+                emp = str(row['EMPREENDIMENTO'])
+
+                # Ao trocar de empreendimento, desenha linha amarela de total do anterior
+                if current_emp is not None and emp != current_emp:
+                    draw_row(current_emp, "TOTAL", fmt_brl(totais_emp[current_emp]), True)
+
+                current_emp = emp
+                draw_row(emp, str(row['UNIDADE']), fmt_brl(fmt_valor(row['VALOR TOTAL'])), False)
+
+            # Linha amarela do último empreendimento
+            if current_emp is not None:
+                draw_row(current_emp, "TOTAL", fmt_brl(totais_emp[current_emp]), True)
 
             # Botão Acessar Formulário
             if link_form:
