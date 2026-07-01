@@ -133,6 +133,9 @@
                                 <button type="button" onclick="toggleCardEdit('card-{{ loop.index }}')" class="p-2 text-sa-muted hover:text-sa-wine hover:bg-sa-wine/5 rounded-lg transition-all" title="Editar Template">
                                     <i data-lucide="pencil" class="w-4 h-4"></i>
                                 </button>
+                                <button type="button" onclick="confirmarDeletarConfig('{{ c.tipo|e }}')" class="p-2 text-sa-muted hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Excluir Template">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
                                 <div class="w-8 h-8 rounded-full bg-sa-gray flex items-center justify-center text-sa-wine group-hover:scale-110 transition-all">
                                     <i data-lucide="layout-template" class="w-4 h-4"></i>
                                 </div>
@@ -187,6 +190,76 @@
     </div>
 </div>
 
+<!-- Formulário oculto compartilhado para exclusão de templates -->
+<form id="form-deletar-config" action="{{ url_for('deletar_config') }}" method="POST" class="hidden">
+    <input type="hidden" name="tipo_alvo" id="input-deletar-tipo">
+</form>
+
+<!-- Planilhas exibidas em Anotações -->
+<section class="bg-white rounded-2xl shadow-sm border border-sa-gray overflow-hidden mt-8">
+    <div class="p-6 border-b border-sa-gray bg-slate-50/50 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-emerald-100 rounded-lg text-emerald-600">
+                <i data-lucide="table" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <h2 class="font-bold text-sa-dark">Planilhas de Anotações</h2>
+                <p class="text-[11px] text-sa-muted mt-0.5">Abas exibidas na tela de Anotações. Cole o link do Google Sheets (a aba/GID é detectada automaticamente).</p>
+            </div>
+        </div>
+    </div>
+    <div class="p-6 space-y-3">
+        <!-- Lista de abas existentes -->
+        {% for ab in abas_anotacao %}
+        <form action="{{ url_for('salvar_aba_anotacao') }}" method="POST" class="flex flex-col md:flex-row gap-2 items-stretch md:items-center bg-slate-50 border border-sa-gray rounded-xl p-3">
+            <input type="hidden" name="aba_id" value="{{ ab.id }}">
+            <input type="text" name="nome" value="{{ ab.nome }}" placeholder="Nome da aba"
+                   class="md:w-56 flex-shrink-0 text-sm font-bold bg-white border border-sa-gray rounded-lg px-3 py-2 outline-none focus:border-sa-wine transition-all">
+            <input type="text" name="link" value="{{ ab.link }}" placeholder="https://docs.google.com/spreadsheets/..."
+                   class="flex-1 text-[11px] font-mono bg-white border border-sa-gray rounded-lg px-3 py-2 outline-none focus:border-sa-wine transition-all">
+            <div class="flex gap-1.5 flex-shrink-0 items-center">
+                <div class="flex flex-col">
+                    <button type="button" onclick="moverAba('{{ ab.id }}', 'cima')" {% if loop.first %}disabled{% endif %}
+                            class="text-sa-muted hover:text-sa-wine disabled:opacity-30 disabled:cursor-not-allowed transition-all" title="Subir">
+                        <i data-lucide="chevron-up" class="w-4 h-4"></i>
+                    </button>
+                    <button type="button" onclick="moverAba('{{ ab.id }}', 'baixo')" {% if loop.last %}disabled{% endif %}
+                            class="text-sa-muted hover:text-sa-wine disabled:opacity-30 disabled:cursor-not-allowed transition-all" title="Descer">
+                        <i data-lucide="chevron-down" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <button type="submit" class="bg-sa-wine text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-sa-wine/90 transition-all whitespace-nowrap">Salvar</button>
+                <button type="button" onclick="confirmarDeletarAba('{{ ab.id }}', '{{ ab.nome|e }}')" class="text-red-500 border border-red-200 px-3 py-2 rounded-lg hover:bg-red-50 transition-all" title="Excluir aba">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </form>
+        {% endfor %}
+
+        <!-- Adicionar nova aba -->
+        <form action="{{ url_for('salvar_aba_anotacao') }}" method="POST" class="flex flex-col md:flex-row gap-2 items-stretch md:items-center border-2 border-dashed border-sa-gray rounded-xl p-3 mt-2">
+            <input type="text" name="nome" placeholder="Nome da nova aba" required
+                   class="md:w-56 flex-shrink-0 text-sm font-bold bg-white border border-sa-gray rounded-lg px-3 py-2 outline-none focus:border-sa-wine transition-all">
+            <input type="text" name="link" placeholder="https://docs.google.com/spreadsheets/..." required
+                   class="flex-1 text-[11px] font-mono bg-white border border-sa-gray rounded-lg px-3 py-2 outline-none focus:border-sa-wine transition-all">
+            <button type="submit" class="bg-sa-dark text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-black transition-all whitespace-nowrap flex items-center justify-center gap-1">
+                <i data-lucide="plus" class="w-4 h-4"></i> Adicionar
+            </button>
+        </form>
+    </div>
+</section>
+
+<!-- Formulário oculto para exclusão de abas de Anotações -->
+<form id="form-deletar-aba" action="{{ url_for('deletar_aba_anotacao') }}" method="POST" class="hidden">
+    <input type="hidden" name="aba_id" id="input-deletar-aba-id">
+</form>
+
+<!-- Formulário oculto para reordenar abas de Anotações -->
+<form id="form-mover-aba" action="{{ url_for('mover_aba_anotacao') }}" method="POST" class="hidden">
+    <input type="hidden" name="aba_id" id="input-mover-aba-id">
+    <input type="hidden" name="direcao" id="input-mover-direcao">
+</form>
+
 <style>
     .config-card.editing {
         border-color: #A90011 !important;
@@ -227,6 +300,26 @@ function confirmarZerar() {
     if (window.confirm('Isso apagará TODA a tabela de supervisores. Esta ação não pode ser desfeita. Deseja continuar?')) {
         document.getElementById('form-zerar').submit();
     }
+}
+
+function confirmarDeletarConfig(tipo) {
+    if (window.confirm('Excluir o template "' + tipo + '"? Esta ação não pode ser desfeita.')) {
+        document.getElementById('input-deletar-tipo').value = tipo;
+        document.getElementById('form-deletar-config').submit();
+    }
+}
+
+function confirmarDeletarAba(id, nome) {
+    if (window.confirm('Excluir a aba "' + nome + '" de Anotações? Esta ação não pode ser desfeita.')) {
+        document.getElementById('input-deletar-aba-id').value = id;
+        document.getElementById('form-deletar-aba').submit();
+    }
+}
+
+function moverAba(id, direcao) {
+    document.getElementById('input-mover-aba-id').value = id;
+    document.getElementById('input-mover-direcao').value = direcao;
+    document.getElementById('form-mover-aba').submit();
 }
 </script>
 {% endblock %}

@@ -79,26 +79,28 @@
 </div>
 
 <script>
-    // Configurações do Iframe e GIDs obtidos do Google Sheets
+    // Configurações do Iframe. As abas agora vêm do banco (configuráveis no admin).
     const userRole = "{{ current_user.role }}";
-    const baseSheetUrl = "https://docs.google.com/spreadsheets/d/1yTBSySvSzB0H5QkknZceoJMeHrPBCOjQ2SzRVBLYoYc";
-    
+
     const sheetTabs = [
-        { id: 'house', label: 'House', gid: '615892992' },
-        { id: 'comissao', label: 'Comissão', gid: '1031660964' },
-        { id: 'adiantamento', label: 'Adiantamento', gid: '1892616393' },
-        { id: 'premio', label: 'Prêmio', gid: '974901862' },
-        { id: 'retroativo', label: 'Retroativo', gid: '1791298828' },
-        { id: 'premiacao_2025', label: 'Premiação Campeões 2025', gid: '480395091' }
+        {% for ab in abas %}
+        { id: '{{ ab.id }}', label: {{ ab.nome|tojson }}, link: {{ ab.link|tojson }} }{% if not loop.last %},{% endif %}
+        {% endfor %}
     ];
 
-    let currentActiveTab = 'house';
+    let currentActiveTab = sheetTabs.length ? sheetTabs[0].id : null;
 
     // Inicializa a barra de abas customizada
     function initTabs() {
         const container = document.getElementById('custom-tabs-container');
         container.innerHTML = '';
-        
+
+        if (!sheetTabs.length) {
+            hideLoader();
+            container.innerHTML = '<span class="text-xs text-sa-muted font-medium">Nenhuma planilha configurada. Adicione uma em Configurações.</span>';
+            return;
+        }
+
         sheetTabs.forEach(tab => {
             const btn = document.createElement('button');
             btn.className = `sa-tab-btn ${tab.id === currentActiveTab ? 'active' : ''}`;
@@ -106,7 +108,7 @@
             btn.onclick = () => switchTab(tab.id);
             container.appendChild(btn);
         });
-        
+
         // Carrega a aba padrão
         loadSheetUrl(currentActiveTab);
     }
@@ -114,13 +116,13 @@
     // Alterna visualmente e carrega a aba selecionada
     function switchTab(tabId) {
         if (tabId === currentActiveTab) return;
-        
+
         currentActiveTab = tabId;
-        
+
         // Atualiza a classe ativa dos botões
         const buttons = document.querySelectorAll('.sa-tab-btn');
         const tabInfo = sheetTabs.find(t => t.id === tabId);
-        
+
         buttons.forEach((btn, index) => {
             if (sheetTabs[index].id === tabId) {
                 btn.classList.add('active');
@@ -128,29 +130,42 @@
                 btn.classList.remove('active');
             }
         });
-        
+
         // Exibe loader e recarrega
         showLoader(`CARREGANDO ABA ${tabInfo.label.toUpperCase()}...`);
         loadSheetUrl(tabId);
     }
 
-    // Gera a URL correta com base na role e GID
+    // Extrai o ID da planilha e o GID de um link do Google Sheets
+    function parseSheetLink(link) {
+        const idMatch = link.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        const gidMatch = link.match(/[#&?]gid=(\d+)/);
+        return {
+            base: idMatch ? `https://docs.google.com/spreadsheets/d/${idMatch[1]}` : null,
+            gid: gidMatch ? gidMatch[1] : null
+        };
+    }
+
+    // Gera a URL correta com base na role e no link salvo
     function loadSheetUrl(tabId) {
         const tabInfo = sheetTabs.find(t => t.id === tabId);
         const iframe = document.getElementById('sheet-iframe');
         const timestamp = new Date().getTime();
-        
+        const { base, gid } = parseSheetLink(tabInfo.link);
+
         let finalUrl = "";
-        if (userRole === 'admin') {
-            // Admins: Edição minimalista no GID correspondente (Query Parameter funcional para /edit)
-            finalUrl = `${baseSheetUrl}/edit?rm=minimal&gid=${tabInfo.gid}&t=${timestamp}`;
+        if (!base) {
+            // Link fora do padrão Google Sheets: usa o link cru
+            finalUrl = tabInfo.link;
+        } else if (userRole === 'admin') {
+            // Admins: Edição minimalista no GID correspondente
+            finalUrl = `${base}/edit?rm=minimal${gid ? `&gid=${gid}` : ''}&t=${timestamp}`;
         } else {
             // Usuários: Apenas visualização limpa (widget=false oculta abas inferiores)
             // IMPORTANTE: No modo /preview, o GID deve ser um Hash Fragment (#gid=) para funcionar.
-            // Usamos um timestamp na query para forçar o recarregamento do iframe no navegador.
-            finalUrl = `${baseSheetUrl}/preview?widget=false&headers=false&t=${timestamp}#gid=${tabInfo.gid}`;
+            finalUrl = `${base}/preview?widget=false&headers=false&t=${timestamp}${gid ? `#gid=${gid}` : ''}`;
         }
-        
+
         iframe.src = finalUrl;
     }
 

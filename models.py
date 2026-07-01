@@ -44,6 +44,13 @@ class Configuracao(db.Model):
     email_retroativo_titulo = db.Column(db.Text, nullable=True)
     email_retroativo_texto = db.Column(db.Text, nullable=True)
 
+class AnotacaoAba(db.Model):
+    """Abas (planilhas) exibidas na tela de Anotações, configuráveis pelo admin."""
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(120), nullable=False)
+    link = db.Column(db.Text, nullable=False)
+    ordem = db.Column(db.Integer, default=0)
+
 class LinkForm(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(200), nullable=False)

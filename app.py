@@ -23,7 +23,7 @@ def admin_required(f):
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
-from models import db, Corretor, Configuracao, EmailConfig, EnvioLog, FilaUpload, EmpreendimentoSupervisor, User, Anotacao, LinkForm
+from models import db, Corretor, Configuracao, EmailConfig, EnvioLog, FilaUpload, EmpreendimentoSupervisor, User, Anotacao, LinkForm, AnotacaoAba
 from services.excel_parser import processar_planilha_base
 from services.pdf_generator import gerar_pdfs
 from services.email_sender import enviar_email_smtp, gerar_html_email
@@ -227,6 +227,21 @@ with app.app_context():
             db.session.add(conf)
         db.session.commit()
     
+    # Semear abas de Anotações padrão se não existirem (primeiro uso)
+    if AnotacaoAba.query.count() == 0:
+        _base_sheet = 'https://docs.google.com/spreadsheets/d/1yTBSySvSzB0H5QkknZceoJMeHrPBCOjQ2SzRVBLYoYc'
+        _abas_padrao = [
+            ('House', '615892992'),
+            ('Comissão', '1031660964'),
+            ('Adiantamento', '1892616393'),
+            ('Prêmio', '974901862'),
+            ('Retroativo', '1791298828'),
+            ('Premiação Campeões 2025', '480395091'),
+        ]
+        for idx, (nome, gid) in enumerate(_abas_padrao):
+            db.session.add(AnotacaoAba(nome=nome, link=f'{_base_sheet}/edit#gid={gid}', ordem=idx))
+        db.session.commit()
+
     # Criar usuário admin padrão se não existir
     if not User.query.filter_by(username='admin').first():
         hashed_pw = generate_password_hash('admin123')
@@ -269,7 +284,7 @@ def index():
     
     total_enviados = query.filter_by(status='Sucesso').count()
     total_erros = query.filter_by(status='Erro').count()
-    ultimos_logs = query.order_by(EnvioLog.data_envio.desc()).limit(50).all()
+    ultimos_logs = query.order_by(EnvioLog.data_envio.desc()).all()
     tipos = [c.tipo for c in Configuracao.query.order_by(Configuracao.id).all()]
     return render_template('dashboard.html', total_enviados=total_enviados, total_erros=total_erros, logs=ultimos_logs, tipos=tipos)
 
@@ -886,11 +901,12 @@ def configuracoes():
         db.session.add(email_conf)
         db.session.commit()
 
-    # Garantir que todos os tipos de configuração existem
-    for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'Comissão IR Futuro', 'House', 'Staff']:
-        if not Configuracao.query.filter_by(tipo=tipo).first():
+    # Semear os tipos padrão apenas no primeiro uso (base vazia).
+    # Depois disso, exclusões feitas pelo admin são respeitadas.
+    if Configuracao.query.count() == 0:
+        for tipo in ['Adiantamento', 'Repasse', 'Prêmio', 'Comissão IR Futuro', 'House', 'Staff']:
             db.session.add(Configuracao(tipo=tipo))
-    db.session.commit()
+        db.session.commit()
 
     if request.method == 'POST':
         section_type = request.form.get('section_type')
@@ -957,12 +973,97 @@ def configuracoes():
         if es.supervisor and '@' in es.supervisor: sup_emails.add(es.supervisor.strip())
         if es.supervisor2 and '@' in es.supervisor2: sup_emails.add(es.supervisor2.strip())
     supervisores_count = len(sup_emails)
-    
-    return render_template('configuracoes.html', 
-                         configs=configs, 
-                         corretores_count=corretores_count, 
+
+    abas_anotacao = AnotacaoAba.query.order_by(AnotacaoAba.ordem, AnotacaoAba.id).all()
+
+    return render_template('configuracoes.html',
+                         configs=configs,
+                         corretores_count=corretores_count,
                          supervisores_count=supervisores_count,
+                         abas_anotacao=abas_anotacao,
                          email_conf=email_conf)
+
+@app.route('/deletar_config', methods=['POST'])
+@login_required
+def deletar_config():
+    if current_user.role != 'admin':
+        return redirect(url_for('corretores_lista'))
+
+    tipo = request.form.get('tipo_alvo')
+    conf = Configuracao.query.filter_by(tipo=tipo).first()
+    if conf:
+        db.session.delete(conf)
+        db.session.commit()
+        flash(f'Template "{tipo}" excluído com sucesso.', 'success')
+    else:
+        flash('Template não encontrado.', 'error')
+
+    return redirect(url_for('configuracoes'))
+
+@app.route('/aba_anotacao/salvar', methods=['POST'])
+@login_required
+def salvar_aba_anotacao():
+    if current_user.role != 'admin':
+        return redirect(url_for('corretores_lista'))
+
+    aba_id = request.form.get('aba_id')
+    nome = (request.form.get('nome') or '').strip()
+    link = (request.form.get('link') or '').strip()
+
+    if not nome or not link:
+        flash('Informe o nome e o link da planilha.', 'error')
+        return redirect(url_for('configuracoes'))
+
+    if aba_id:
+        aba = AnotacaoAba.query.get(aba_id)
+        if aba:
+            aba.nome = nome
+            aba.link = link
+            db.session.commit()
+            flash(f'Aba "{nome}" atualizada com sucesso.', 'success')
+    else:
+        max_ordem = db.session.query(db.func.max(AnotacaoAba.ordem)).scalar() or 0
+        db.session.add(AnotacaoAba(nome=nome, link=link, ordem=max_ordem + 1))
+        db.session.commit()
+        flash(f'Aba "{nome}" adicionada com sucesso.', 'success')
+
+    return redirect(url_for('configuracoes'))
+
+@app.route('/aba_anotacao/mover', methods=['POST'])
+@login_required
+def mover_aba_anotacao():
+    if current_user.role != 'admin':
+        return redirect(url_for('corretores_lista'))
+
+    aba = AnotacaoAba.query.get(request.form.get('aba_id'))
+    direcao = request.form.get('direcao')  # 'cima' ou 'baixo'
+    if aba and direcao in ('cima', 'baixo'):
+        abas = AnotacaoAba.query.order_by(AnotacaoAba.ordem, AnotacaoAba.id).all()
+        idx = next((i for i, a in enumerate(abas) if a.id == aba.id), None)
+        vizinho_idx = idx - 1 if direcao == 'cima' else idx + 1
+        if idx is not None and 0 <= vizinho_idx < len(abas):
+            vizinho = abas[vizinho_idx]
+            aba.ordem, vizinho.ordem = vizinho.ordem, aba.ordem
+            db.session.commit()
+
+    return redirect(url_for('configuracoes'))
+
+@app.route('/aba_anotacao/deletar', methods=['POST'])
+@login_required
+def deletar_aba_anotacao():
+    if current_user.role != 'admin':
+        return redirect(url_for('corretores_lista'))
+
+    aba = AnotacaoAba.query.get(request.form.get('aba_id'))
+    if aba:
+        nome = aba.nome
+        db.session.delete(aba)
+        db.session.commit()
+        flash(f'Aba "{nome}" excluída com sucesso.', 'success')
+    else:
+        flash('Aba não encontrada.', 'error')
+
+    return redirect(url_for('configuracoes'))
 
 @app.route('/colaboradores')
 @login_required
@@ -1212,7 +1313,9 @@ def anotacoes():
             'dados': rows,
             'layout': layout
         })
-    return render_template('anotacoes.html', anotacoes=anotacoes)
+    abas = AnotacaoAba.query.order_by(AnotacaoAba.ordem, AnotacaoAba.id).all()
+    abas_data = [{'id': ab.id, 'nome': ab.nome, 'link': ab.link} for ab in abas]
+    return render_template('anotacoes.html', anotacoes=anotacoes, abas=abas_data)
 
 @app.route('/api/anotacoes', methods=['POST'])
 @login_required
