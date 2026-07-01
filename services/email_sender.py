@@ -268,6 +268,7 @@ def gerar_html_email(nome_colaborador, tipo, config, token=None):
                 </div>
                 <ul style="margin:0;padding-left:18px;font-size:13px;color:#78350f;line-height:1.7;">
                     <li>As notas devem ser enviadas <b>única e exclusivamente</b> pelo formulário acima.</li>
+                    <li>Informe os <b>dados bancários no corpo da nota</b>.</li>
                     <li>Notas enviadas <b>após o prazo</b> serão programadas para pagamento no <b>mês seguinte</b>.</li>
                     <li>Caso seja constatado <b>erro na emissão</b> da nota, o responsável terá <b>24 horas</b> para a correção da mesma, a partir da notificação.</li>
                 </ul>
