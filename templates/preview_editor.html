@@ -28,8 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Tornar elementos editáveis
     const ids = [
         'edit-titulo', 'edit-subtitulo', 'edit-alerta-amarelo', 'edit-alerta-vermelho', 
-        'edit-corpo', 'edit-conferencia', 'edit-cnpjs', 'edit-prazo', 
-        'edit-retroativo-titulo', 'edit-retroativo-texto', 'edit-rodape'
+        'edit-corpo', 'edit-conferencia', 'edit-cnpjs', 'edit-prazo',
+        'edit-rodape'
     ];
     ids.forEach(id => {
         const el = document.getElementById(id);
@@ -62,8 +62,6 @@ function salvarAlteracoes() {
         corpo: document.getElementById('edit-corpo')?.innerHTML || '',
         cnpjs: document.getElementById('edit-cnpjs')?.innerHTML || '',
         prazo: document.getElementById('edit-prazo')?.innerHTML || '',
-        retroativo_titulo: document.getElementById('edit-retroativo-titulo')?.innerHTML || '',
-        retroativo_texto: document.getElementById('edit-retroativo-texto')?.innerHTML || '',
         rodape: document.getElementById('edit-rodape')?.innerHTML || ''
     };
 

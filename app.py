@@ -936,7 +936,6 @@ def configuracoes():
                 new_mes = request.form.get("mes_referencia")
 
                 conf.link_form = request.form.get("link_form")
-                conf.link_form_retroativo = request.form.get("link_form_retroativo")
                 conf.data_limite_envio = new_date
                 conf.data_pagamento = new_pgto
                 conf.mes_referencia = new_mes
@@ -1287,9 +1286,7 @@ def salvar_template():
         conf.email_rodape = data.get('rodape')
         conf.email_cnpjs = data.get('cnpjs')
         conf.email_prazo = data.get('prazo')
-        conf.email_retroativo_titulo = data.get('retroativo_titulo')
-        conf.email_retroativo_texto = data.get('retroativo_texto')
-        
+
         db.session.commit()
         return jsonify({'sucesso': True})
     except Exception as e:

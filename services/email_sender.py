@@ -74,7 +74,6 @@ def enviar_email_smtp(email_colaborador, nome_colaborador, supervisor, superviso
 
 def gerar_html_email(nome_colaborador, tipo, config, token=None):
     link_form = config.get('link_form', '#')
-    link_retroativo = config.get('link_form_retroativo', '#')
     data_limite = config.get('data_limite_envio', '15/05 às 15h59')
     data_pagamento = config.get('data_pagamento', '27/05 e 30/05')
     mes_ref = config.get('mes_referencia', 'Abril 2026')
@@ -123,9 +122,6 @@ def gerar_html_email(nome_colaborador, tipo, config, token=None):
         if 'programados entre' in rodape:
             rodape = re.sub(r'(programados entre\s*<b>).*?(</b>)', rf'\g<1>{data_pagamento}\g<2>', rodape, flags=re.IGNORECASE)
     
-    retro_titulo = config.get('email_retroativo_titulo') or 'Envio de Notas Retroativas'
-    retro_texto = config.get('email_retroativo_texto') or 'Caso tenha perdido o prazo de envio ou tenha notas referentes a meses anteriores, encaminhe pelo formulário abaixo:'
-
     # Lista de CNPJs (Padrão se vazio)
     cnpjs_html = config.get('email_cnpjs')
     if not cnpjs_html:
@@ -265,17 +261,16 @@ def gerar_html_email(nome_colaborador, tipo, config, token=None):
               </div>
             </div>
 
-            <!-- Formulário Retroativo -->
-            <div id="edit-retroativo-box" style="margin:20px 0 16px 0; padding:16px; border-radius:12px; background:#fefce8; border:1px solid #fde047;">
-                <div id="edit-retroativo-titulo" style="font-size:13.5px;font-weight:700;color:#854d0e;margin-bottom:8px;">
-                    {retro_titulo}
+            <!-- Avisos Importantes -->
+            <div style="margin:20px 0 16px 0; padding:16px 18px; border-radius:12px; background:#fffbeb; border:1px solid #fcd34d;">
+                <div style="font-size:13.5px;font-weight:700;color:#92400e;margin-bottom:10px;">
+                    ⚠️ Avisos Importantes
                 </div>
-                <div id="edit-retroativo-texto" style="font-size:13px;color:#713f12;line-height:1.6;margin-bottom:12px;">
-                    {retro_texto}
-                </div>
-                <a href="{link_retroativo}" style="display:inline-block;padding:9px 16px;border-radius:999px;background:#facc15;color:#422006;text-decoration:none;font-size:13px;font-weight:700;">
-                    Formulário de Retroativas
-                </a>
+                <ul style="margin:0;padding-left:18px;font-size:13px;color:#78350f;line-height:1.7;">
+                    <li>As notas devem ser enviadas <b>única e exclusivamente</b> pelo formulário acima.</li>
+                    <li>Notas enviadas <b>após o prazo</b> serão programadas para pagamento no <b>mês seguinte</b>.</li>
+                    <li>Caso seja constatado <b>erro na emissão</b> da nota, o responsável terá <b>24 horas</b> para a correção da mesma, a partir da notificação.</li>
+                </ul>
             </div>
 
             <p id="edit-rodape" style="margin:0 0 10px 0;font-size:13.8px;line-height:1.8;color:#374151;">
