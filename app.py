@@ -983,6 +983,24 @@ def configuracoes():
                          abas_anotacao=abas_anotacao,
                          email_conf=email_conf)
 
+@app.route('/adicionar_config', methods=['POST'])
+@login_required
+def adicionar_config():
+    if current_user.role != 'admin':
+        return redirect(url_for('corretores_lista'))
+
+    novo_tipo = (request.form.get('novo_tipo') or '').strip()
+    if not novo_tipo:
+        flash('Informe o nome do novo tipo de envio.', 'error')
+    elif Configuracao.query.filter_by(tipo=novo_tipo).first():
+        flash(f'Já existe um template chamado "{novo_tipo}".', 'error')
+    else:
+        db.session.add(Configuracao(tipo=novo_tipo))
+        db.session.commit()
+        flash(f'Template "{novo_tipo}" criado com sucesso.', 'success')
+
+    return redirect(url_for('configuracoes'))
+
 @app.route('/deletar_config', methods=['POST'])
 @login_required
 def deletar_config():
