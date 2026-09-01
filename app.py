@@ -732,8 +732,6 @@ def arquivar_periodo():
 
         from sqlalchemy import or_
         logs = EnvioLog.query.filter(or_(EnvioLog.arquivado == False, EnvioLog.arquivado == None)).all()
-        if not logs:
-            return jsonify({'sucesso': False, 'erro': 'Não há envios para arquivar.'}), 400
 
         agora = get_brasilia_time()
         slug = re.sub(r'[^a-z0-9_-]+', '_', nome.lower()).strip('_') or f"lote_{int(agora.timestamp())}"
@@ -781,6 +779,10 @@ def arquivar_periodo():
                     varridos += 1
                 except Exception:
                     pass
+
+        if not logs and not varridos:
+            db.session.rollback()
+            return jsonify({'sucesso': False, 'erro': 'Não há envios ou arquivos para arquivar.'}), 400
 
         db.session.commit()
         return jsonify({'sucesso': True, 'total': len(logs), 'extras': varridos, 'lote': nome})
