@@ -98,6 +98,9 @@ class EnvioLog(db.Model):
     cc_emails = db.Column(db.Text, nullable=True)
     token = db.Column(db.String(64), unique=True, default=lambda: secrets.token_urlsafe(32))
     regional = db.Column(db.String(50), nullable=True)
+    arquivado = db.Column(db.Boolean, default=False)
+    lote_arquivo = db.Column(db.String(200), nullable=True)
+    data_arquivamento = db.Column(db.DateTime, nullable=True)
 
 class Anotacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)

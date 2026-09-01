@@ -101,6 +101,13 @@
                 <span class="ml-3 font-semibold text-xs whitespace-nowrap transition-all duration-300 sidebar-text">Anotações</span>
             </a>
 
+            <a href="{{ url_for('historico') }}" class="flex items-center px-2 py-2 rounded-lg group transition-colors {% if request.endpoint in ['historico', 'historico_detalhe'] %} bg-sa-wine text-white {% else %} text-slate-400 hover:bg-white/5 hover:text-white {% endif %}" title="Histórico">
+                <div class="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                    <i data-lucide="archive" class="w-4 h-4"></i>
+                </div>
+                <span class="ml-3 font-semibold text-xs whitespace-nowrap transition-all duration-300 sidebar-text">Histórico</span>
+            </a>
+
             {% if current_user.role == 'admin' %}
             <div class="pt-4 pb-2 px-4 admin-label">
                 <span class="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Administração</span>

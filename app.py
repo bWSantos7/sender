@@ -4,6 +4,7 @@ import random
 import re
 import os
 import io
+import shutil
 import zipfile
 import json
 from datetime import datetime, timedelta
@@ -204,6 +205,18 @@ with app.app_context():
     except Exception:
         db.session.rollback()
 
+    # Migração: colunas de arquivamento de histórico (envio_log)
+    for ddl in [
+        "ALTER TABLE envio_log ADD COLUMN arquivado BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE envio_log ADD COLUMN lote_arquivo VARCHAR(200)",
+        "ALTER TABLE envio_log ADD COLUMN data_arquivamento TIMESTAMP",
+    ]:
+        try:
+            db.session.execute(db.text(ddl))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
     # Migração: renomear tipo e resetar CNPJ customizados para usar template padrão completo
     old_conf = Configuracao.query.filter_by(tipo='Premiação - Metas').first()
     if old_conf:
@@ -276,12 +289,12 @@ def logout():
 @app.route('/')
 @login_required
 def index():
-    query = EnvioLog.query
+    from sqlalchemy import or_
+    query = EnvioLog.query.filter(or_(EnvioLog.arquivado == False, EnvioLog.arquivado == None))
     if current_user.role != 'admin':
         # Mostrar logs da regional do usuário OU logs antigos que estão sem regional (None)
-        from sqlalchemy import or_
         query = query.filter(or_(EnvioLog.regional == current_user.regional, EnvioLog.regional == None))
-    
+
     total_enviados = query.filter_by(status='Sucesso').count()
     total_erros = query.filter_by(status='Erro').count()
     ultimos_logs = query.order_by(EnvioLog.data_envio.desc()).all()
@@ -652,7 +665,8 @@ def processar_fila_background():
 @app.route('/api/status_envio')
 @login_required
 def status_envio():
-    query_log = EnvioLog.query
+    from sqlalchemy import or_
+    query_log = EnvioLog.query.filter(or_(EnvioLog.arquivado == False, EnvioLog.arquivado == None))
     query_fila = FilaUpload.query
 
     # Indicadores históricos (Dashboard)
@@ -705,6 +719,78 @@ def limpar_logs():
         return jsonify({'sucesso': True})
     except Exception as e:
         return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+@app.route('/arquivar_periodo', methods=['POST'])
+@login_required
+@admin_required
+def arquivar_periodo():
+    try:
+        data = request.get_json(silent=True) or {}
+        nome = (data.get('nome') or request.form.get('nome') or '').strip()
+        if not nome:
+            return jsonify({'sucesso': False, 'erro': 'Informe um nome para o histórico.'}), 400
+
+        from sqlalchemy import or_
+        logs = EnvioLog.query.filter(or_(EnvioLog.arquivado == False, EnvioLog.arquivado == None)).all()
+        if not logs:
+            return jsonify({'sucesso': False, 'erro': 'Não há envios para arquivar.'}), 400
+
+        agora = get_brasilia_time()
+        slug = re.sub(r'[^a-z0-9_-]+', '_', nome.lower()).strip('_') or f"lote_{int(agora.timestamp())}"
+        base_uploads = os.path.realpath(os.path.join(app.root_path, 'uploads'))
+        destino_lote = os.path.join(base_uploads, '_arquivo', slug)
+
+        for log in logs:
+            log.arquivado = True
+            log.lote_arquivo = nome
+            log.data_arquivamento = agora
+
+            if log.caminho_anexo:
+                origem = os.path.realpath(os.path.join(base_uploads, log.caminho_anexo))
+                if origem.startswith(base_uploads + os.sep) and os.path.exists(origem):
+                    destino = os.path.join(destino_lote, log.caminho_anexo)
+                    os.makedirs(os.path.dirname(destino), exist_ok=True)
+                    try:
+                        shutil.move(origem, destino)
+                        log.caminho_anexo = f"_arquivo/{slug}/{log.caminho_anexo}".replace('\\', '/')
+                    except Exception:
+                        pass
+
+        db.session.commit()
+        return jsonify({'sucesso': True, 'total': len(logs), 'lote': nome})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'sucesso': False, 'erro': str(e)}), 500
+
+@app.route('/historico')
+@login_required
+def historico():
+    query = db.session.query(
+        EnvioLog.lote_arquivo,
+        db.func.count(EnvioLog.id),
+        db.func.max(EnvioLog.data_arquivamento)
+    ).filter(EnvioLog.arquivado == True)
+    if current_user.role != 'admin':
+        from sqlalchemy import or_
+        query = query.filter(or_(EnvioLog.regional == current_user.regional, EnvioLog.regional == None))
+    lotes = query.group_by(EnvioLog.lote_arquivo).order_by(db.func.max(EnvioLog.data_arquivamento).desc()).all()
+    return render_template('historico.html', lotes=lotes)
+
+@app.route('/historico/<path:lote>')
+@login_required
+def historico_detalhe(lote):
+    query = EnvioLog.query.filter_by(lote_arquivo=lote, arquivado=True)
+    if current_user.role != 'admin':
+        from sqlalchemy import or_
+        query = query.filter(or_(EnvioLog.regional == current_user.regional, EnvioLog.regional == None))
+    logs = query.order_by(EnvioLog.data_envio.desc()).all()
+    if not logs:
+        flash('Histórico não encontrado.', 'error')
+        return redirect(url_for('historico'))
+    total_sucesso = sum(1 for l in logs if l.status == 'Sucesso')
+    total_erros = sum(1 for l in logs if l.status == 'Erro')
+    tipos = [c.tipo for c in Configuracao.query.order_by(Configuracao.id).all()]
+    return render_template('historico_detalhe.html', lote=lote, logs=logs, total_sucesso=total_sucesso, total_erros=total_erros, tipos=tipos)
 
 @app.route('/parar_envios', methods=['POST'])
 @login_required
@@ -1097,6 +1183,7 @@ def arquivos():
     
     if os.path.exists(base_uploads):
         for root, dirs, files in os.walk(base_uploads):
+            dirs[:] = [d for d in dirs if d != '_arquivo']
             for file in files:
                 if file == '.gitkeep': continue
                 caminho_completo = os.path.join(root, file)

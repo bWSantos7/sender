@@ -1,51 +1,43 @@
 {% extends "base.html" %}
 
+{% block header_title %}Histórico{% endblock %}
+
 {% block content %}
-<!-- Cabeçalho de Indicadores (Apenas Admin) -->
-{% if current_user.role == 'admin' %}
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+<div class="flex items-center justify-between">
+    <a href="{{ url_for('historico') }}" class="inline-flex items-center gap-1.5 text-[11px] font-bold text-sa-muted hover:text-sa-wine transition-colors">
+        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Voltar ao histórico
+    </a>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="bg-white border border-sa-gray p-6 rounded-lg shadow-sm md:col-span-1">
+        <span class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Período</span>
+        <h3 class="text-lg font-bold text-sa-text mt-2">{{ lote }}</h3>
+        <button onclick="baixarTodosPdfs()" class="mt-4 w-full flex items-center justify-center gap-1.5 text-[10px] font-bold text-white bg-sa-wine hover:bg-sa-red transition-colors px-3 py-2 rounded-lg">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> BAIXAR TODOS OS PDFs (ZIP)
+        </button>
+    </div>
     <div class="bg-white border border-sa-gray p-6 rounded-lg shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <span class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Sucessos</span>
-            <div class="p-2 bg-emerald-50 text-emerald-600 rounded">
-                <i data-lucide="check" class="w-4 h-4"></i>
-            </div>
+            <div class="p-2 bg-emerald-50 text-emerald-600 rounded"><i data-lucide="check" class="w-4 h-4"></i></div>
         </div>
-        <h3 id="total-sucesso" class="text-3xl font-bold text-sa-text">{{ total_enviados }}</h3>
+        <h3 class="text-3xl font-bold text-sa-text">{{ total_sucesso }}</h3>
         <p class="text-[10px] text-emerald-600 font-bold mt-2">E-mails entregues</p>
     </div>
-
     <div class="bg-white border border-sa-gray p-6 rounded-lg shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <span class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Erros</span>
-            <div class="p-2 bg-red-50 text-sa-red rounded">
-                <i data-lucide="x" class="w-4 h-4"></i>
-            </div>
+            <div class="p-2 bg-red-50 text-sa-red rounded"><i data-lucide="x" class="w-4 h-4"></i></div>
         </div>
-        <h3 id="total-erro" class="text-3xl font-bold text-sa-text">{{ total_erros }}</h3>
+        <h3 class="text-3xl font-bold text-sa-text">{{ total_erros }}</h3>
         <p class="text-[10px] text-sa-red font-bold mt-2">Falhas registradas</p>
     </div>
-
-    <div class="bg-white border border-sa-gray p-6 rounded-lg shadow-sm flex flex-col justify-between">
-        <div class="flex items-center justify-between">
-            <span class="text-[10px] font-bold text-sa-muted uppercase tracking-widest">Ações Rápidas</span>
-            <button onclick="limparHistorico()" class="text-[10px] font-bold text-sa-red hover:underline">LIMPAR LOGS</button>
-        </div>
-        <div class="mt-4 flex items-center justify-between gap-2">
-            <p class="text-[10px] text-sa-muted">Encerrar o período atual, guardar no histórico e zerar os indicadores.</p>
-            <button onclick="arquivarPeriodo()" class="flex-shrink-0 flex items-center gap-1.5 text-[10px] font-bold text-white bg-sa-wine hover:bg-sa-red transition-colors px-3 py-2 rounded-lg">
-                <i data-lucide="archive" class="w-3.5 h-3.5"></i> ARQUIVAR MÊS
-            </button>
-        </div>
-    </div>
 </div>
-{% endif %}
 
 <div class="bg-white border border-sa-gray rounded-lg shadow-sm overflow-hidden">
     <div class="px-6 py-4 border-b border-sa-gray bg-slate-50 flex justify-between items-center">
-        <h3 class="text-xs font-bold text-sa-text uppercase tracking-widest">Relatório de Envios</h3>
-        
-        <!-- Filtros Avançados -->
+        <h3 class="text-xs font-bold text-sa-text uppercase tracking-widest">Registros do Período</h3>
         <div class="flex items-center gap-3 flex-wrap">
             <div class="relative">
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-sa-muted pointer-events-none"></i>
@@ -85,7 +77,8 @@
                     data-corretor="{{ (log.corretor.nome if log.corretor else '') | lower }}"
                     data-email="{{ (log.destinatario_email or '') | lower }}"
                     data-tipo="{{ log.tipo | lower }}"
-                    data-status="{{ log.status | lower }}">
+                    data-status="{{ log.status | lower }}"
+                    data-caminho="{{ log.caminho_anexo or '' }}">
                     <td class="px-6 py-4 font-semibold text-sa-text text-[11px]">{{ log.corretor.nome if log.corretor else 'Desconhecido' }}</td>
                     <td class="px-6 py-4 text-sa-muted text-[11px]">{{ log.destinatario_email or (log.corretor.email if log.corretor else '-') }}</td>
                     <td class="px-6 py-4">
@@ -159,43 +152,27 @@ function abrirPDF(caminhoFull) {
     if (relPath) window.open('/api/visualizar_arquivo/' + relPath, '_blank');
 }
 
-function updateDashboard() {
-    fetch('/api/status_envio').then(function(r) { return r.json(); }).then(function(data) {
-        const tSucesso = document.getElementById('total-sucesso');
-        const tErro = document.getElementById('total-erro');
-        if (tSucesso) tSucesso.innerText = data.concluidos;
-        if (tErro) tErro.innerText = data.erros;
-    }).catch(function() {});
-}
-
-function limparHistorico() {
-    if (!confirm('Deseja apagar todos os registros de envio? Esta ação não pode ser desfeita.')) return;
-    fetch('/limpar_logs', { method: 'POST' }).then(function() { window.location.reload(); });
-}
-
-function arquivarPeriodo() {
-    const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    const hoje = new Date();
-    const sugestao = 'E-mails enviados ' + meses[hoje.getMonth()] + ' ' + hoje.getFullYear();
-    const nome = prompt('Nome para este histórico:', sugestao);
-    if (!nome || !nome.trim()) return;
-    if (!confirm('Isso vai guardar todos os envios e PDFs atuais como "' + nome.trim() + '" e zerar os indicadores da tela principal. Os registros continuarão acessíveis em Histórico. Confirmar?')) return;
-
-    fetch('/arquivar_periodo', {
+function baixarTodosPdfs() {
+    const caminhos = Array.from(document.querySelectorAll('.log-row'))
+        .map(function(row) { return row.dataset.caminho; })
+        .filter(Boolean);
+    if (!caminhos.length) { showToast('Nenhum PDF disponível neste período.', 'warning'); return; }
+    fetch('/api/download_massa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nome: nome.trim() })
-    }).then(function(r) { return r.json(); }).then(function(data) {
-        if (data.sucesso) {
-            showToast(data.total + ' envio(s) arquivado(s) em "' + data.lote + '".', 'success');
-            setTimeout(function() { window.location.reload(); }, 1200);
-        } else {
-            showToast(data.erro || 'Erro ao arquivar.', 'error');
-        }
-    }).catch(function() { showToast('Erro ao arquivar.', 'error'); });
+        body: JSON.stringify({ arquivos: caminhos })
+    }).then(function(r) { return r.blob(); }).then(function(blob) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'historico_{{ lote|replace(" ", "_") }}.zip';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    }).catch(function() { showToast('Erro ao baixar os PDFs.', 'error'); });
 }
 
 filtrarTabela();
-setInterval(updateDashboard, 15000);
 </script>
 {% endblock %}
