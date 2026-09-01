@@ -756,8 +756,34 @@ def arquivar_periodo():
                     except Exception:
                         pass
 
+        # Varredura: mover também PDFs sem EnvioLog associado (uploads manuais,
+        # gerados mas nunca enviados etc.), preservando o que ainda está na fila
+        # (Pendente/Processando) para não atrapalhar um envio em andamento.
+        protegidos = {
+            item.caminho_pdf.replace('\\', '/')
+            for item in FilaUpload.query.filter(FilaUpload.status.in_(['Pendente', 'Processando'])).all()
+            if item.caminho_pdf
+        }
+        varridos = 0
+        for root, dirs, files in os.walk(base_uploads):
+            dirs[:] = [d for d in dirs if d != '_arquivo']
+            for file in files:
+                if file in ('.gitkeep', 'temp.xlsx'):
+                    continue
+                origem = os.path.join(root, file)
+                rel_path = os.path.relpath(origem, base_uploads).replace('\\', '/')
+                if rel_path in protegidos:
+                    continue
+                destino = os.path.join(destino_lote, rel_path)
+                os.makedirs(os.path.dirname(destino), exist_ok=True)
+                try:
+                    shutil.move(origem, destino)
+                    varridos += 1
+                except Exception:
+                    pass
+
         db.session.commit()
-        return jsonify({'sucesso': True, 'total': len(logs), 'lote': nome})
+        return jsonify({'sucesso': True, 'total': len(logs), 'extras': varridos, 'lote': nome})
     except Exception as e:
         db.session.rollback()
         return jsonify({'sucesso': False, 'erro': str(e)}), 500

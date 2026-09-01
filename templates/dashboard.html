@@ -187,7 +187,9 @@ function arquivarPeriodo() {
         body: JSON.stringify({ nome: nome.trim() })
     }).then(function(r) { return r.json(); }).then(function(data) {
         if (data.sucesso) {
-            showToast(data.total + ' envio(s) arquivado(s) em "' + data.lote + '".', 'success');
+            let msg = data.total + ' envio(s) arquivado(s) em "' + data.lote + '"';
+            if (data.extras) msg += ' (+' + data.extras + ' PDF(s) avulso(s))';
+            showToast(msg + '.', 'success');
             setTimeout(function() { window.location.reload(); }, 1200);
         } else {
             showToast(data.erro || 'Erro ao arquivar.', 'error');
