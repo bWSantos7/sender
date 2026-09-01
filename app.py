@@ -824,7 +824,7 @@ def historico_detalhe(lote):
         return redirect(url_for('historico'))
     total_sucesso = sum(1 for l in logs if l.status == 'Sucesso')
     total_erros = sum(1 for l in logs if l.status == 'Erro')
-    tipos = [c.tipo for c in Configuracao.query.order_by(Configuracao.id).all()]
+    tipos = sorted({l.tipo for l in logs if l.tipo})
     return render_template('historico_detalhe.html', lote=lote, logs=logs, total_sucesso=total_sucesso, total_erros=total_erros, tipos=tipos)
 
 @app.route('/parar_envios', methods=['POST'])
