@@ -174,12 +174,26 @@ function limparHistorico() {
 }
 
 function arquivarPeriodo() {
-    const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    const hoje = new Date();
-    const sugestao = 'E-mails enviados ' + meses[hoje.getMonth()] + ' ' + hoje.getFullYear();
-    const nome = prompt('Nome para este histórico:', sugestao);
-    if (!nome || !nome.trim()) return;
-    if (!confirm('Isso vai guardar todos os envios e PDFs atuais como "' + nome.trim() + '" e zerar os indicadores da tela principal. Os registros continuarão acessíveis em Histórico. Confirmar?')) return;
+    const ultimoLote = {{ (ultimo_lote or '') | tojson }};
+    let nome = null;
+
+    if (ultimoLote) {
+        const usarExistente = confirm('Já existe o período "' + ultimoLote + '" no Histórico.\n\nOK = adicionar estes envios/PDFs a ele (mesma pasta)\nCancelar = criar um novo período');
+        if (usarExistente) {
+            nome = ultimoLote;
+        }
+    }
+
+    if (!nome) {
+        const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        const hoje = new Date();
+        const sugestao = 'E-mails enviados ' + meses[hoje.getMonth()] + ' ' + hoje.getFullYear();
+        nome = prompt('Nome para o novo período:', sugestao);
+        if (!nome || !nome.trim()) return;
+        nome = nome.trim();
+    }
+
+    if (!confirm('Isso vai guardar todos os envios e PDFs atuais como "' + nome + '" e zerar os indicadores da tela principal. Os registros continuarão acessíveis em Histórico. Confirmar?')) return;
 
     fetch('/arquivar_periodo', {
         method: 'POST',

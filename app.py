@@ -299,7 +299,14 @@ def index():
     total_erros = query.filter_by(status='Erro').count()
     ultimos_logs = query.order_by(EnvioLog.data_envio.desc()).all()
     tipos = [c.tipo for c in Configuracao.query.order_by(Configuracao.id).all()]
-    return render_template('dashboard.html', total_enviados=total_enviados, total_erros=total_erros, logs=ultimos_logs, tipos=tipos)
+
+    ultimo_lote = None
+    if current_user.role == 'admin':
+        row = db.session.query(EnvioLog.lote_arquivo).filter(EnvioLog.lote_arquivo != None) \
+            .order_by(EnvioLog.data_arquivamento.desc()).first()
+        ultimo_lote = row[0] if row else None
+
+    return render_template('dashboard.html', total_enviados=total_enviados, total_erros=total_erros, logs=ultimos_logs, tipos=tipos, ultimo_lote=ultimo_lote)
 
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required
