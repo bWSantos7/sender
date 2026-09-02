@@ -300,13 +300,22 @@ def index():
     ultimos_logs = query.order_by(EnvioLog.data_envio.desc()).all()
     tipos = [c.tipo for c in Configuracao.query.order_by(Configuracao.id).all()]
 
-    ultimo_lote = None
+    lotes_existentes = []
     if current_user.role == 'admin':
-        row = db.session.query(EnvioLog.lote_arquivo).filter(EnvioLog.lote_arquivo != None) \
-            .order_by(EnvioLog.data_arquivamento.desc()).first()
-        ultimo_lote = row[0] if row else None
+        rows = db.session.query(
+            EnvioLog.lote_arquivo,
+            db.func.count(EnvioLog.id),
+            db.func.max(EnvioLog.data_arquivamento)
+        ).filter(EnvioLog.lote_arquivo != None) \
+         .group_by(EnvioLog.lote_arquivo) \
+         .order_by(db.func.max(EnvioLog.data_arquivamento).desc()) \
+         .limit(20).all()
+        lotes_existentes = [
+            {'nome': nome, 'total': total, 'data': data.strftime('%d/%m/%Y') if data else ''}
+            for nome, total, data in rows
+        ]
 
-    return render_template('dashboard.html', total_enviados=total_enviados, total_erros=total_erros, logs=ultimos_logs, tipos=tipos, ultimo_lote=ultimo_lote)
+    return render_template('dashboard.html', total_enviados=total_enviados, total_erros=total_erros, logs=ultimos_logs, tipos=tipos, lotes_existentes=lotes_existentes)
 
 @app.route('/upload', methods=['GET', 'POST'])
 @login_required

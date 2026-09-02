@@ -206,6 +206,7 @@
                     </div>
                 </div>
                 <input id="modal-input" type="text" class="hidden mt-4 w-full px-3 py-2.5 text-[12px] font-semibold text-sa-text bg-white border border-sa-gray rounded-lg outline-none focus:ring-2 focus:ring-sa-wine/30 focus:border-sa-wine transition-all">
+                <div id="modal-list" class="hidden mt-4 max-h-56 overflow-y-auto space-y-1"></div>
             </div>
             <div class="flex justify-end gap-2 px-6 py-4 bg-slate-50 border-t border-sa-gray">
                 <button id="modal-btn-cancel" class="text-[11px] font-bold text-sa-muted hover:text-sa-text hover:bg-slate-100 px-4 py-2 rounded-lg transition-colors">Cancelar</button>
@@ -256,8 +257,10 @@
                 const titleEl = document.getElementById('modal-title');
                 const msgEl = document.getElementById('modal-message');
                 const inputEl = document.getElementById('modal-input');
+                const listEl = document.getElementById('modal-list');
                 const btnCancel = document.getElementById('modal-btn-cancel');
                 const btnConfirm = document.getElementById('modal-btn-confirm');
+                const temItens = Array.isArray(opts.items);
 
                 const tone = opts.tone === 'red' ? 'red' : 'wine';
                 iconEl.className = 'p-2.5 rounded-lg flex-shrink-0 ' + (tone === 'red' ? 'bg-red-50 text-sa-red' : 'bg-sa-wine/5 text-sa-wine');
@@ -272,11 +275,45 @@
                     inputEl.classList.add('hidden');
                 }
 
+                let firstItemBtn = null;
+                if (temItens) {
+                    listEl.classList.remove('hidden');
+                    listEl.innerHTML = '';
+                    opts.items.forEach(function(item) {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-transparent hover:bg-slate-50 hover:border-sa-gray transition-colors text-left';
+                        btn.innerHTML = '<span class="flex items-center gap-2.5 min-w-0">'
+                            + '<i data-lucide="' + (item.icon || 'archive') + '" class="w-3.5 h-3.5 text-sa-wine flex-shrink-0"></i>'
+                            + '<span class="min-w-0">'
+                            +   '<span class="block text-[11px] font-bold text-sa-text truncate">' + item.label + '</span>'
+                            +   (item.sublabel ? '<span class="block text-[10px] text-sa-muted mt-0.5">' + item.sublabel + '</span>' : '')
+                            + '</span></span>'
+                            + '<i data-lucide="chevron-right" class="w-3.5 h-3.5 text-sa-muted flex-shrink-0"></i>';
+                        btn.onclick = function() { finish(item.value); };
+                        listEl.appendChild(btn);
+                        if (!firstItemBtn) firstItemBtn = btn;
+                    });
+                    if (opts.newLabel) {
+                        const btnNew = document.createElement('button');
+                        btnNew.type = 'button';
+                        btnNew.className = 'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-dashed border-sa-gray hover:border-sa-wine hover:bg-sa-wine/5 transition-colors text-left mt-1';
+                        btnNew.innerHTML = '<i data-lucide="plus" class="w-3.5 h-3.5 text-sa-wine flex-shrink-0"></i>'
+                            + '<span class="text-[11px] font-bold text-sa-wine">' + opts.newLabel + '</span>';
+                        btnNew.onclick = function() { finish('__new__'); };
+                        listEl.appendChild(btnNew);
+                    }
+                    lucide.createIcons({ nodes: [listEl] });
+                } else {
+                    listEl.classList.add('hidden');
+                }
+
                 btnCancel.textContent = opts.cancelText || 'Cancelar';
                 btnCancel.classList.toggle('hidden', opts.hideCancel === true);
                 btnConfirm.textContent = opts.confirmText || 'Confirmar';
                 btnConfirm.className = 'text-[11px] font-bold text-white px-4 py-2 rounded-lg transition-colors shadow-sm '
                     + (tone === 'red' ? 'bg-sa-red hover:bg-red-700' : 'bg-sa-wine hover:bg-sa-red');
+                btnConfirm.classList.toggle('hidden', temItens);
 
                 overlay.classList.remove('hidden');
                 lucide.createIcons({ nodes: [iconEl] });
@@ -295,11 +332,11 @@
                         const val = inputEl.value.trim();
                         if (!val) { inputEl.focus(); return; }
                         finish(val);
-                    } else {
+                    } else if (!temItens) {
                         finish(true);
                     }
                 }
-                function doCancel() { finish(opts.input ? null : false); }
+                function doCancel() { finish((opts.input || temItens) ? null : false); }
 
                 function onKeydown(e) {
                     if (e.key === 'Enter') { e.preventDefault(); doConfirm(); }
@@ -313,6 +350,7 @@
 
                 setTimeout(function() {
                     if (opts.input) { inputEl.focus(); inputEl.select(); }
+                    else if (temItens && firstItemBtn) { firstItemBtn.focus(); }
                     else { btnConfirm.focus(); }
                 }, 50);
             });
@@ -320,6 +358,7 @@
 
         function showConfirm(opts) { return abrirModal(Object.assign({ input: false }, opts)); }
         function showPrompt(opts) { return abrirModal(Object.assign({ input: true }, opts)); }
+        function showSelect(opts) { return abrirModal(Object.assign({ input: false }, opts)); }
 
         document.addEventListener('DOMContentLoaded', function() {
             const raw = document.getElementById('flash-data');

@@ -182,31 +182,36 @@ async function limparHistorico() {
 }
 
 async function arquivarPeriodo() {
-    const ultimoLote = {{ (ultimo_lote or '') | tojson }};
+    const lotesExistentes = {{ lotes_existentes | tojson }};
     let nome = null;
 
-    if (ultimoLote) {
-        const usarExistente = await showConfirm({
-            title: 'Período já existente',
-            message: 'Já existe o período "' + ultimoLote + '" no Histórico.\n\nVocê pode adicionar estes envios/PDFs a ele (mesma pasta) ou criar um novo período.',
+    function sugestaoNovoPeriodo() {
+        const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        const hoje = new Date();
+        return 'E-mails enviados ' + meses[hoje.getMonth()] + ' ' + hoje.getFullYear();
+    }
+
+    if (lotesExistentes.length) {
+        const escolha = await showSelect({
+            title: 'Arquivar mês',
+            message: 'Escolha um período já existente para adicionar estes envios/PDFs, ou crie um novo.',
             icon: 'archive',
-            confirmText: 'Usar este período',
-            cancelText: 'Criar novo período'
+            items: lotesExistentes.map(function(l) {
+                return { value: l.nome, label: l.nome, sublabel: l.total + ' registro(s) · ' + l.data };
+            }),
+            newLabel: 'Criar novo período',
+            cancelText: 'Cancelar'
         });
-        if (usarExistente) {
-            nome = ultimoLote;
-        }
+        if (!escolha) return;
+        nome = escolha === '__new__' ? null : escolha;
     }
 
     if (!nome) {
-        const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-        const hoje = new Date();
-        const sugestao = 'E-mails enviados ' + meses[hoje.getMonth()] + ' ' + hoje.getFullYear();
         nome = await showPrompt({
             title: 'Novo período',
             message: 'Digite um nome para identificar este histórico.',
             icon: 'archive',
-            defaultValue: sugestao,
+            defaultValue: sugestaoNovoPeriodo(),
             confirmText: 'Continuar',
             cancelText: 'Cancelar'
         });
