@@ -168,17 +168,31 @@ function updateDashboard() {
     }).catch(function() {});
 }
 
-function limparHistorico() {
-    if (!confirm('Deseja apagar todos os registros de envio? Esta ação não pode ser desfeita.')) return;
+async function limparHistorico() {
+    const ok = await showConfirm({
+        title: 'Limpar logs',
+        message: 'Deseja apagar todos os registros de envio? Esta ação não pode ser desfeita.',
+        icon: 'trash-2',
+        tone: 'red',
+        confirmText: 'Apagar tudo',
+        cancelText: 'Cancelar'
+    });
+    if (!ok) return;
     fetch('/limpar_logs', { method: 'POST' }).then(function() { window.location.reload(); });
 }
 
-function arquivarPeriodo() {
+async function arquivarPeriodo() {
     const ultimoLote = {{ (ultimo_lote or '') | tojson }};
     let nome = null;
 
     if (ultimoLote) {
-        const usarExistente = confirm('Já existe o período "' + ultimoLote + '" no Histórico.\n\nOK = adicionar estes envios/PDFs a ele (mesma pasta)\nCancelar = criar um novo período');
+        const usarExistente = await showConfirm({
+            title: 'Período já existente',
+            message: 'Já existe o período "' + ultimoLote + '" no Histórico.\n\nVocê pode adicionar estes envios/PDFs a ele (mesma pasta) ou criar um novo período.',
+            icon: 'archive',
+            confirmText: 'Usar este período',
+            cancelText: 'Criar novo período'
+        });
         if (usarExistente) {
             nome = ultimoLote;
         }
@@ -188,12 +202,27 @@ function arquivarPeriodo() {
         const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
         const hoje = new Date();
         const sugestao = 'E-mails enviados ' + meses[hoje.getMonth()] + ' ' + hoje.getFullYear();
-        nome = prompt('Nome para o novo período:', sugestao);
-        if (!nome || !nome.trim()) return;
+        nome = await showPrompt({
+            title: 'Novo período',
+            message: 'Digite um nome para identificar este histórico.',
+            icon: 'archive',
+            defaultValue: sugestao,
+            confirmText: 'Continuar',
+            cancelText: 'Cancelar'
+        });
+        if (!nome) return;
         nome = nome.trim();
+        if (!nome) return;
     }
 
-    if (!confirm('Isso vai guardar todos os envios e PDFs atuais como "' + nome + '" e zerar os indicadores da tela principal. Os registros continuarão acessíveis em Histórico. Confirmar?')) return;
+    const confirmado = await showConfirm({
+        title: 'Arquivar mês',
+        message: 'Isso vai guardar todos os envios e PDFs atuais como "' + nome + '" e zerar os indicadores da tela principal. Os registros continuarão acessíveis em Histórico.',
+        icon: 'archive',
+        confirmText: 'Arquivar',
+        cancelText: 'Cancelar'
+    });
+    if (!confirmado) return;
 
     fetch('/arquivar_periodo', {
         method: 'POST',

@@ -57,6 +57,10 @@
         .toast-info    { background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; }
         .toast-close   { margin-left:auto; cursor:pointer; opacity:.5; flex-shrink:0; line-height:1; font-size:1rem; }
         .toast-close:hover { opacity:1; }
+
+        /* Modal */
+        .animate-modal-in { animation: modal-in .18s ease; }
+        @keyframes modal-in { from{opacity:0;transform:scale(.96) translateY(4px)} to{opacity:1;transform:none} }
     </style>
 </head>
 <body class="h-full font-sans text-sa-text antialiased flex overflow-hidden">
@@ -190,6 +194,26 @@
     <!-- Toast container -->
     <div id="toast-container"></div>
 
+    <!-- Modal (confirm/prompt estilizados) -->
+    <div id="modal-overlay" class="hidden fixed inset-0 bg-black/50 z-[9998] flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-modal-in">
+            <div class="px-6 pt-6 pb-5">
+                <div class="flex items-start gap-3">
+                    <div id="modal-icon" class="p-2.5 rounded-lg flex-shrink-0"></div>
+                    <div class="flex-1 min-w-0 pt-0.5">
+                        <h3 id="modal-title" class="text-[13px] font-bold text-sa-text"></h3>
+                        <p id="modal-message" class="text-[11px] text-sa-muted mt-1.5 leading-relaxed whitespace-pre-line"></p>
+                    </div>
+                </div>
+                <input id="modal-input" type="text" class="hidden mt-4 w-full px-3 py-2.5 text-[12px] font-semibold text-sa-text bg-white border border-sa-gray rounded-lg outline-none focus:ring-2 focus:ring-sa-wine/30 focus:border-sa-wine transition-all">
+            </div>
+            <div class="flex justify-end gap-2 px-6 py-4 bg-slate-50 border-t border-sa-gray">
+                <button id="modal-btn-cancel" class="text-[11px] font-bold text-sa-muted hover:text-sa-text hover:bg-slate-100 px-4 py-2 rounded-lg transition-colors">Cancelar</button>
+                <button id="modal-btn-confirm" class="text-[11px] font-bold text-white bg-sa-wine hover:bg-sa-red px-4 py-2 rounded-lg transition-colors shadow-sm">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Flash messages como data attributes (evita Jinja2 dentro de script) -->
     <div id="flash-data" class="hidden"
          data-messages="{{ get_flashed_messages(with_categories=true) | tojson | e }}">
@@ -223,6 +247,79 @@
             lucide.createIcons({ nodes: [el] });
             setTimeout(function() { el.style.opacity = '0'; el.style.transition = 'opacity .4s'; setTimeout(function() { el.remove(); }, 400); }, 5000);
         }
+
+        // Modal (substitui confirm()/prompt() nativos por um pop-up estilizado)
+        function abrirModal(opts) {
+            return new Promise(function(resolve) {
+                const overlay = document.getElementById('modal-overlay');
+                const iconEl = document.getElementById('modal-icon');
+                const titleEl = document.getElementById('modal-title');
+                const msgEl = document.getElementById('modal-message');
+                const inputEl = document.getElementById('modal-input');
+                const btnCancel = document.getElementById('modal-btn-cancel');
+                const btnConfirm = document.getElementById('modal-btn-confirm');
+
+                const tone = opts.tone === 'red' ? 'red' : 'wine';
+                iconEl.className = 'p-2.5 rounded-lg flex-shrink-0 ' + (tone === 'red' ? 'bg-red-50 text-sa-red' : 'bg-sa-wine/5 text-sa-wine');
+                iconEl.innerHTML = '<i data-lucide="' + (opts.icon || 'help-circle') + '" class="w-4 h-4"></i>';
+                titleEl.textContent = opts.title || '';
+                msgEl.textContent = opts.message || '';
+
+                if (opts.input) {
+                    inputEl.classList.remove('hidden');
+                    inputEl.value = opts.defaultValue || '';
+                } else {
+                    inputEl.classList.add('hidden');
+                }
+
+                btnCancel.textContent = opts.cancelText || 'Cancelar';
+                btnCancel.classList.toggle('hidden', opts.hideCancel === true);
+                btnConfirm.textContent = opts.confirmText || 'Confirmar';
+                btnConfirm.className = 'text-[11px] font-bold text-white px-4 py-2 rounded-lg transition-colors shadow-sm '
+                    + (tone === 'red' ? 'bg-sa-red hover:bg-red-700' : 'bg-sa-wine hover:bg-sa-red');
+
+                overlay.classList.remove('hidden');
+                lucide.createIcons({ nodes: [iconEl] });
+
+                function finish(result) {
+                    overlay.classList.add('hidden');
+                    btnConfirm.onclick = null;
+                    btnCancel.onclick = null;
+                    overlay.onclick = null;
+                    document.removeEventListener('keydown', onKeydown);
+                    resolve(result);
+                }
+
+                function doConfirm() {
+                    if (opts.input) {
+                        const val = inputEl.value.trim();
+                        if (!val) { inputEl.focus(); return; }
+                        finish(val);
+                    } else {
+                        finish(true);
+                    }
+                }
+                function doCancel() { finish(opts.input ? null : false); }
+
+                function onKeydown(e) {
+                    if (e.key === 'Enter') { e.preventDefault(); doConfirm(); }
+                    else if (e.key === 'Escape') { doCancel(); }
+                }
+
+                btnConfirm.onclick = doConfirm;
+                btnCancel.onclick = doCancel;
+                overlay.onclick = function(e) { if (e.target === overlay) doCancel(); };
+                document.addEventListener('keydown', onKeydown);
+
+                setTimeout(function() {
+                    if (opts.input) { inputEl.focus(); inputEl.select(); }
+                    else { btnConfirm.focus(); }
+                }, 50);
+            });
+        }
+
+        function showConfirm(opts) { return abrirModal(Object.assign({ input: false }, opts)); }
+        function showPrompt(opts) { return abrirModal(Object.assign({ input: true }, opts)); }
 
         document.addEventListener('DOMContentLoaded', function() {
             const raw = document.getElementById('flash-data');
